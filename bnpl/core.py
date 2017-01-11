@@ -129,10 +129,16 @@ class ElasticRecordStore(Store):
     if not self.exists(sound):
       sound.created_at = now()
       sound.updated_at = now()
-    self.es.index(index=self.index, 
+      return self.es.index(index=self.index, 
+                    doc_type=self.doc_type, 
+                    id=sound.uid,
+                    body=sound.to_dict())
+
+    sound.updated_at = now()
+    return self.es.update(index=self.index, 
                   doc_type=self.doc_type, 
                   id=sound.uid,
-                  body=sound.to_dict())
+                  body={"doc":sound.to_dict()})
 
   def rm(self, sound):
     """
