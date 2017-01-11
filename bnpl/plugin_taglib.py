@@ -4,6 +4,7 @@ from bnpl.core import Transformer
 
 
 class GetTags(Transformer):
+  
   EXTRACT = [
     'ARTIST',
     'ALBUM',

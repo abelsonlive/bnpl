@@ -15,7 +15,7 @@ class FreeSound(Transformer):
     """
 
     """
-    self.params.setdefault('freesound_path', 
+    self.options.setdefault('freesound_path', 
                             here(__file__, 'ext/{0}/essentia-streaming-freesound-extractor')
                                             .format(self.config['platform']))
     
@@ -25,7 +25,7 @@ class FreeSound(Transformer):
     ostats = o + "_statistics.yaml"
 
     # cmd 
-    cmd = "{freesound_path} '{0}' '{1}'".format(sound.path, o, **self.params)
+    cmd = "{freesound_path} '{0}' '{1}'".format(sound.path, o, **self.options)
     print cmd
     proc = shell(cmd)
     if not proc.ok: 
