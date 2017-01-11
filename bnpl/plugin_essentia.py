@@ -23,10 +23,12 @@ class FreeSound(Transformer):
     ostats = o + "_statistics.yaml"
 
     # cmd 
-    cmd = "{freesound_path} '{0}' '{1}' > /dev/null".format(sound.file, o, **self.params)
+    cmd = "{freesound_path} '{0}' '{1}'".format(sound.path, o, **self.params)
+    print cmd
     proc = shell(cmd)
     if not proc.ok: 
-        raise Exception("Error running: {0}".format(cmd))
+
+        raise Exception("Error running: {0}\n{1}".format(cmd, proc.stdout))
 
     # grab output files
     # frames = json_file_to_obj(oframes)

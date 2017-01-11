@@ -9,11 +9,10 @@ import copy
 import s3plz
 from unidecode import unidecode
 from slugify import slugify
-import smart_open
 from elasticsearch import Elasticsearch
 
 
-from bnpl.util import here, get_config, flatten, async, pooled
+from bnpl.util import here, get_config, flatten, async, pooled, uid, obj_to_json, now
 
 config = get_config(os.getenv('BNPL_CONFIG', here(__file__, 'config/')))
 
@@ -28,113 +27,89 @@ class Store(Config):
 
   def put(self, sound):
     """
-
     """
     raise NotImplemented
 
   def get(self, sound):
     """
-
     """
     raise NotImplemented
 
   def rm(self, sound):
     """
-
     """
     raise NotImplemented 
 
   def bulk(self, sounds):
     """
-
     """
     raise NotImplemented
 
 
-class FileStore(Store):
+class S3FileStore(Store):
   """
   Blob Store works with s3 / local directory
   """
   s3 = s3plz.connect(config['s3']['bucket'], 
                      key=config['s3']['key'], 
-                     secret=config['s3']['secret'])
-
+                     secret=config['s3']['secret'],
+                     serializer=config['bnpl']['file_compression'])
 
   def get(self, sound):
     """
     get sound byes from the blob store.
     """
-    with smart_open.smart_open(sound.url, 'rb') as f:
-      return f.read()
+    return self.s3.get(sound.url)
 
   def put(self, sound):
     """
     put a sound into the blob store
     """
     if not self.exists(sound):
-      with smart_open.smart_open(sound.url, 'wb') as f:
-        f.write(sound.path)
+      with open(sound.path, 'rb') as f:
+        return self.s3.put(f.read(), sound.url)
 
   def rm(self, sound):
     """
     Remove a sound from the blob store
     """
-    return self._rm(sound.url)
+    self.s3.delete(sound.url)
 
   def exists(self, sound):
     """
     check if a sound exists in the blob store
     """
-    return self._exists(sound.url)
+    return self.s3.exists(sound.url)
 
-  def bulk(self, sounds):
+  def bulk(self, sounds, size=10):
 
     for sound in sounds:
       self.put(sound)
     # for snd in pooled(self.put, sounds):
     #   pass
 
-  def _rm(self, path):
-    """
-
-    """
-    if path.startswith('s3://'):
-      return self.s3.delete(path)
-    return os.remove(path)
-
-  def _exists(self, path):
-    """
-
-    """
-    if path.startswith('s3://'):
-      return self.s3.exists(path)
-    return os.path.exists(path)
-
 
 class ElasticRecordStore(Store):
   """
   
   """
-
-  def setup(self):
-    """
-
-    """
-    self.es = Elasticsearch(self.config['elastic']['urls'])
+  es = Elasticsearch(config['elastic']['urls'])
+  index = config['elastic']['index']
+  doc_type = config['elastic']['doc_type']
 
   def get(self, sound):
     """
     Get a sound from ElasticSearch
     """
-    hit = self.es.get(index=self.config['elastic']['index'], 
-                      doc_type=self.config['elastic']['doc_type'], id=sound.uid)
+    hit = self.es.get(index=self.index, 
+                      doc_type=self.doc_type, id=sound.uid)
     return self._sound_from_hit(hit)
 
   def mget(self, sounds):
     """
     """
-    res = self.es.mget(index=self.config['elastic']['index'], 
-                       doc_type=self.config['elastic']['doc_type'],
+    res = self.es.mget(index=self.index, 
+                       doc_type=self.doc_type,
                        ids=[sound.uid for sound in sounds])
     return self._sounds_from_res(res)
 
@@ -142,8 +117,8 @@ class ElasticRecordStore(Store):
     """
 
     """
-    res = self.es.search(index=self.config['elastic']['index'], 
-                         doc_type=self.config['elastic']['doc_type'],
+    res = self.es.search(index=self.index, 
+                         doc_type=self.doc_type,
                          body=query)
     return self._sounds_from_res(res)
 
@@ -151,25 +126,28 @@ class ElasticRecordStore(Store):
     """
     Upsert a record
     """
-    return self.es.update(index=self.config['elastic']['index'], 
-                          doc_type=self.config['elastic']['doc_type'], 
-                          id=sound.uid,
-                          body=sound.to_dict())
+    if not self.exists(sound):
+      sound.created_at = now()
+      sound.updated_at = now()
+    self.es.update(index=self.index, 
+                  doc_type=self.doc_type, 
+                  id=sound.uid,
+                  body=dict(doc=sound.to_dict()))
 
   def rm(self, sound):
     """
     Delete a record
     """
-    return self.es.delete(index=self.config['elastic']['index'], 
-                          doc_type=self.config['elastic']['doc_type'], 
+    return self.es.delete(index=self.index, 
+                          doc_type=self.doc_type, 
                           id=sound.uid)
 
   def exists(self, sound):
     """
     Delete a record
     """
-    return self.es.exists(index=self.config['elastic']['index'], 
-                          doc_type=self.config['elastic']['doc_type'], 
+    return self.es.exists(index=self.index, 
+                          doc_type=self.doc_type, 
                           id=sound.uid)
 
   def bulk(self, sounds):
@@ -182,7 +160,7 @@ class ElasticRecordStore(Store):
     """
     Refresh the infex.
     """
-    return self.es.indices.refresh(index=self.config['elastic']['index'])
+    return self.es.indices.refresh(index=self.index)
 
   def _format_bulk(self, sound):
     """
@@ -190,7 +168,7 @@ class ElasticRecordStore(Store):
     """
     return '{"update": {"_index":"{0}", "_type": "{1}", "_id": "{2}"}}\n{"doc":{3}}'\
               .format(self.config['elastic']['index'], 
-                      self.config['elastic']['doc_type'],
+                      self.doc_type,
                       sound.uid,
                       sound.to_json())
 
@@ -208,6 +186,8 @@ class ElasticRecordStore(Store):
       yield self._sound_from_hit(hit)
 
 
+
+
 class Sound(Config):
   """
   A sound is initialized by recieving a path and a list of arbitrary parameters.
@@ -222,12 +202,12 @@ class Sound(Config):
 
   """
   # TODO: make these configurable
-  file_store = FileStore()
+  file_store = S3FileStore()
   record_store = ElasticRecordStore() 
 
   def  __init__(self, **properties):
-    self.uid = properties.pop('uid', None)
-    self.path = properties.pop('path', '')
+    self.path = properties.pop('path','')
+    self.uid = properties.pop('uid', uid(self.path))
     self.is_local = not self.path.startswith('s3://')
     self.created_at = properties.pop('created_at', None) 
     self.updated_at = properties.pop('updated_at', None) 
@@ -246,24 +226,25 @@ class Sound(Config):
     """
     generate a filename for a sound
     """
-    path_params = self.to_flat_dict()
-
     # blah
     try:
-      assert('format' in params)
+      assert('format' in self.properties)
     except:
       ValueError('A sound needs a format to generate a filename.')
 
     # create format string
     frmt = ""
-    for k in self.config['bnpl']['path_keys']:
-      if k in params:
-        frmt += "{0}_".format(slugify(str(params.get(k)).lower()))
-    frmt = frmt[:-1] + ".{format}" + '.{0}'.format(self.config['bnpl']['file_compression'])
-    fn = frmt.format(**params)
+    for k in self.config['bnpl']['file_path_keys']:
+      v = getattr(self, k, self.properties.get(k, None))
+      if v:
+        frmt += "{0}{1}".format(slugify(str(v).lower()), self.config['bnpl']['file_path_delim'])
+    f = frmt[:-1].strip()
+    if not f:
+      f = slugify(".".join(self.path.split('/')[-1].split('.')[:-1])).lower()
+    fn = f + "." + self.properties['format'] + '.' +  self.config['bnpl']['file_compression']
 
     # handle no compression
-    if fn.endwith('.'):
+    if fn.endswith('.'):
       fn = fn[:-1]
 
     return fn
@@ -288,23 +269,31 @@ class Sound(Config):
     """
     if self.uid is None:
       raise ValueError('You must include a uid when saving a sound')
-    return "{0}/{1}/{2}".format(config.bnpl.file_dir, self.uid, self.filename)
+    return "{0}/{1}/{2}".format(self.config['bnpl']['file_dir'], self.uid, self.filename)
 
   def to_dict(self):
-    d = {
+    """
+
+    """
+    return {
       "uid": self.uid,
       "path": self.path,
+      "filename": self.filename,
+      "url": self.url,
       "is_local": self.is_local,
       "created_at": self.created_at, 
       "updated_at": self.updated_at, 
       "properties": self.properties
     }
-    try:
-      d['filename'] = self.filename
-      d['url'] = self.url
-    except:
-      pass
-    return d
+
+  def to_flat_dict(self):
+    """
+
+    """
+    d = self.to_dict()
+    p = d.pop('properties', {})
+    d.update(p)
+    return flatten(d)
 
   def to_json(self):
     """
@@ -438,12 +427,40 @@ class Sound(Config):
     # return parallel([self.file_rm, self.record_rm])
 
 
+# core storage object
+class Store(Config):
+
+
+  def put(self, sound):
+    """
+
+    """
+    raise NotImplemented
+
+  def get(self, sound):
+    """
+
+    """
+    raise NotImplemented
+
+  def rm(self, sound):
+    """
+
+    """
+    raise NotImplemented 
+
+  def bulk(self, sounds):
+    """
+
+    """
+    raise NotImplemented
+
+
 class Option(Config): 
   def __init__(self, name, **kwargs):
     self.name = name
     self.type = kwargs.get('type', 'string')
     self.default = kwargs.get('default', None)
-
 
 
 class Plugin(Config):

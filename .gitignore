@@ -3,5 +3,6 @@
 *.db
 build/
 dist/
+ext/
 *.egg-info/
 bnpl/config/*.yml

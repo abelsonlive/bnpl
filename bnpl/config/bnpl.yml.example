@@ -1,0 +1,10 @@
+# core settings
+bnpl:
+  file_dir: 's3://foo/bar'
+  file_compression: 'gz'
+  file_path_keys:
+    - bpm
+    - key
+    - artist
+    - title
+    - year

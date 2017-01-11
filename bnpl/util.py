@@ -11,6 +11,8 @@ import os
 import re
 import sys
 import uuid
+import hashlib
+import json
 import platform
 import sha
 import collections

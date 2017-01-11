@@ -6,8 +6,6 @@ from bnpl.core import Transformer
 
 class UID(Transformer):
 
-  def _uid_from_fingerprint(self, fingerprint):
-    return uid(fingerprint)
 
   def transform(self, sound):
     self.params.setdefault('fpcalc_path', here(__file__, 'ext/{0}/chromaprint-fpcalc'.format(self.config['platform'])))
