@@ -483,7 +483,7 @@ class Exporter(Plugin):
   """
 
   def export(self, sounds):
-    raise NotImplementede
+    raise NotImplemented
 
 
 class Extractor(Plugin):

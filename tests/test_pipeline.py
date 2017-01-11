@@ -4,15 +4,20 @@ from bnpl import plugin_fpcalc as fpcalc
 from bnpl import plugin_essentia as essentia
 from bnpl import plugin_taglib as taglib 
 
-FIXTURES = here(__file__, 'fixtures')
+# extract sounds from a directory
+snds = file.Directory(path=here(__file__, 'fixtures')).extract()
 
-directory = file.Directory(path=FIXTURES)
-ess = essentia.FreeSound()
-fpc = fpcalc.UID()
-tags = taglib.GetTags()
-snds = list(directory.extract())
-snds = pooled(fpc.transform, snds)
-snds = pooled(tags.transform, snds)
-# snds = pooled(ess.transform, snds)
+# run UID transform
+snds = pooled(fpcalc.UID().transform, snds)
+
+# get tags
+snds = pooled(taglib.GetTags().transform, snds)
+
+# get bpm/key
+snds = pooled(essentia.FreeSound().transform, snds)
+
+# store in s3/es
 map(lambda x: x.put(), list(snds))
+
+# log
 print snds[-1].to_json()

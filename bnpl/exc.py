@@ -6,8 +6,5 @@ class ExtractorError(Exception):
 class TransformerError(Exception):
 	pass
 
-class LoaderError(Exception):
-	pass
-
 class ExporterError(Exception):
 	pass

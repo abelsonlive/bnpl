@@ -16,7 +16,7 @@ class FreeSound(Transformer):
 
     """
     self.options.setdefault('freesound_path', 
-                            here(__file__, 'ext/{0}/essentia-streaming-freesound-extractor')
+                            here(__file__, 'ext/{0}/essentia-st-pitchmelodia')
                                             .format(self.config['platform']))
     
     # configure

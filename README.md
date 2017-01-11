@@ -28,3 +28,27 @@ make ssh # connect to container
 python tests/test_pipeline.py
 ```
 
+## API / Usage
+
+See [tests/test_pipeline.py](tests/test_pipline.py) for now.
+
+The idea is to string pipelines together through three core plugin objects:
+
+`extractors` - takes options and returns one or more sounds (i.e. a directory or a iTunes XML file or an ElasticSearch query)
+`transformers` - takes a sound and options returns one or more sounds
+`exporters` - takes a list of sounds and options returns a link to a single file or archive of files representing all of these sounds (i.e. a directory or a iTunes XML file).
+
+
+## TODO 
+
+- [ ] Fix Mac OS X Essentia Installation 
+- [ ] DIY BPM / Pitch Detection? Can we get speed Increases ?
+- [ ] Create "Options" object for declaring inputs to Plugins
+- [ ] String together plugins via command line 
+- [ ] Execute plugins via API.
+- [ ] ElasticSearch Plugin for searching sounds
+- [ ] React App for browsing / listening / uploading sounds.
+- [ ] Massive Import
+- [ ] Add Users / Customizations to App
+
+

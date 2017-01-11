@@ -121,14 +121,14 @@ def json_file_to_obj(p):
   """
 
   """
-  return json_to_obj(open(p))
+  return json_to_obj(open(p).read())
 
 
 def json_to_obj(s):
   """
   
   """
-  return json.load(s)
+  return json.loads(s)
 
 
 def obj_to_json(o):
