@@ -11,18 +11,18 @@ import os
 import re
 import sys
 import uuid
+import time
 import hashlib
 import json
-import platform
-import sha
+import logging
 import collections
 import subprocess
 from datetime import datetime
 from functools import wraps
+from traceback import format_exc
 
 import requests
 import yaml
-import logging
 
 
 def here(f, *args):
@@ -338,26 +338,18 @@ def retry(*dargs, **dkwargs):
                 try:
                     r = f(*args, **kw)
                     err = False
+                    if isinstance(r, requests.Response): 
+                       r.raise_for_status()
+                    break
 
                 except Exception as e:
+                    err = True
                     if verbose:
                         logging.warning('Exception - {} on try {} for {}'.format(format_exc(), tries, args))
                     if raise_uncaught_errors:
                         raise e
                     else:
                         time.sleep(wait_time)
-
-                # check the status code if its a response object
-                if isinstance(r, requests.Response):
-                    try:
-                        r.raise_for_status()
-                    except requests.exceptions.HTTPError as e:
-                        if verbose:
-                            logging.warning('Bad Status Code - {} for {}'.format(r.status_code, args))
-                        time.sleep(wait_time)
-
-                elif not err:
-                    break
 
             return r
 

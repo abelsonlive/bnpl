@@ -247,7 +247,7 @@ class Sound(Config):
         frmt += slugify(unicode(v).lower()) + self.config['bnpl']['file_path_delim']
     f = frmt[:-1].strip()
     if not f:
-      f = slugify(".".join(self.path.split('/')[-1].split('.')[:-1])).lower()
+      f = slugify(unicode(".".join(self.path.split('/')[-1].split('.')[:-1])).lower())
     fn = f + "." + self.properties['format'] + '.' +  self.config['bnpl']['file_compression']
 
     # handle no compression
