@@ -8,10 +8,10 @@ class Directory(Extractor):
 
   def extract(self):
     
-    assert('path' in self.params)
-    self.params.setdefault('formats', ['mp3', 'wav', 'aif', 'aiff', 'm4a', 'flac'])
+    assert('path' in self.options)
+    self.options.setdefault('formats', ['mp3', 'wav', 'aif', 'aiff', 'm4a', 'flac'])
 
-    for f in listdir(self.params['path']):
-      for fmt in self.params['formats']:
+    for f in listdir(self.options['path']):
+      for fmt in self.options['formats']:
         if f.endswith(fmt):
-          yield Sound(format=fmt, is_local= True, path=f)
+          yield Sound(format=fmt, is_local=True, path=f)

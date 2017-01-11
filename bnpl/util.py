@@ -3,7 +3,7 @@ self contained utlities
 should not reference other modules here
 """
 import gevent.monkey
-gevent.monkey.patch_socket()
+gevent.monkey.patch_all()
 import gevent
 from gevent.pool import Pool
 
@@ -17,9 +17,12 @@ import platform
 import sha
 import collections
 import subprocess
-from datetime import datetime 
+from datetime import datetime
+from functools import wraps
 
+import requests
 import yaml
+import logging
 
 
 def here(f, *args):
@@ -279,3 +282,85 @@ def shell(cmd):
   p = _proc(cmd)
   p.run()
   return p
+
+
+def retry(*dargs, **dkwargs):
+    """A decorator for performing http requests and catching all concievable errors.
+       Useful for including in scrapers for unreliable webservers.
+       @retry(attempts=3)
+       def buggy_request():
+           return requests.get('http://www.gooooooooooooogle.com')
+       buggy_request()
+       >>> None
+    """
+    # set defaults
+    attempts = dkwargs.get('attempts',3)
+    wait = dkwargs.get('wait', 1)
+    backoff = dkwargs.get('backoff', 2)
+    verbose = dkwargs.get('verbose', True)
+    raise_uncaught_errors = dkwargs.get('raise_uncaught_errors', True)
+    null_value = dkwargs.get('null_value', None)
+
+    # wrapper
+    def wrapper(f):
+
+        # logger
+        log = logging.getLogger(f.__name__)
+
+        @wraps(f)
+        def wrapped_func(*args, **kw):
+
+            # defaults
+            r = null_value
+            tries = 0
+            err = True
+
+            # for ref problems
+            bckof = backoff * 1
+            wait_time = wait * 1
+
+            while 1:
+
+                # if we've exceeded the maximum number of tries,
+                # return
+                if tries == attempts:
+                    if verbose:
+                        log.error('Request to {} Failed after {} tries.'.format(args, tries))
+                    return r
+
+                # increment tries
+                tries += 1
+
+                # calc wait time for this step
+                wait_time *= bckof
+
+                # try the function
+                try:
+                    r = f(*args, **kw)
+                    err = False
+
+                except Exception as e:
+                    if verbose:
+                        logging.warning('Exception - {} on try {} for {}'.format(format_exc(), tries, args))
+                    if raise_uncaught_errors:
+                        raise e
+                    else:
+                        time.sleep(wait_time)
+
+                # check the status code if its a response object
+                if isinstance(r, requests.Response):
+                    try:
+                        r.raise_for_status()
+                    except requests.exceptions.HTTPError as e:
+                        if verbose:
+                            logging.warning('Bad Status Code - {} for {}'.format(r.status_code, args))
+                        time.sleep(wait_time)
+
+                elif not err:
+                    break
+
+            return r
+
+        return wrapped_func
+
+    return wrapper

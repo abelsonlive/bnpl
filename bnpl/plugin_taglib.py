@@ -17,6 +17,6 @@ class GetTags(Transformer):
     sound.properties.update({
       key.lower():values[0] 
       for key, values in taglib.File(sound.path).tags.iteritems() 
-      if key in self.EXTRACT
+      if key.upper() in self.EXTRACT
     })
     return sound

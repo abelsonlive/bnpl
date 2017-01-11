@@ -11,7 +11,7 @@ from unidecode import unidecode
 from slugify import slugify
 from elasticsearch import Elasticsearch
 
-from bnpl.util import here, get_config, flatten, async, pooled, uid, obj_to_json, now
+from bnpl.util import here, get_config, flatten, async, pooled, uid, obj_to_json, now, retry
 
 config = get_config(os.getenv('BNPL_CONFIG', here(__file__, 'config/')))
 
@@ -52,15 +52,16 @@ class S3FileStore(Store):
   s3 = s3plz.connect(config['aws']['s3_bucket'], 
                      key=config['aws']['key'], 
                      secret=config['aws']['secret'],
-                     serializer=config['bnpl']['file_compression'],
-                     public=config['aws']['s3_public'])
+                     serializer=config['bnpl']['file_compression'])
 
+  @retry(attempts=3)
   def get(self, sound):
     """
     get sound byes from the blob store.
     """
     return self.s3.get(sound.url)
 
+  @retry(attempts=3)
   def put(self, sound):
     """
     put a sound into the blob store
@@ -71,12 +72,13 @@ class S3FileStore(Store):
         self.s3.put(f.read(), sound.url)
       return sound
 
-
+  @retry(attempts=3)
   def rm(self, sound):
     """
     Remove a sound from the blob store
     """
     self.s3.delete(sound.url)
+
 
   def exists(self, sound):
     """
@@ -84,6 +86,7 @@ class S3FileStore(Store):
     """
     return self.s3.exists(sound.url)
 
+  @retry(attempts=3)
   def bulk(self, sounds, size=10):
 
     for sound in sounds:
@@ -125,6 +128,7 @@ class ElasticRecordStore(Store):
                          body=query)
     return self._sounds_from_res(res)
 
+  @retry(attempts=3)
   def put(self, sound):
     """
     Upsert a record
@@ -135,6 +139,7 @@ class ElasticRecordStore(Store):
                   body=sound.to_dict())
     return sound
 
+  @retry(attempts=3)
   def rm(self, sound):
     """
     Delete a record
@@ -466,8 +471,8 @@ class Option(Config):
 class Plugin(Config):
   
   # TODO:
-  def __init__(self, **params):
-    self.params = params 
+  def __init__(self, **options):
+    self.options = options 
 
 
 class Exporter(Plugin):

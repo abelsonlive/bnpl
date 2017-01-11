@@ -1,4 +1,4 @@
-from bnpl.util import here
+from bnpl.util import here, pooled
 from bnpl import plugin_file as file
 from bnpl import plugin_fpcalc as fpcalc
 from bnpl import plugin_essentia as essentia
@@ -11,8 +11,8 @@ ess = essentia.FreeSound()
 fpc = fpcalc.UID()
 tags = taglib.GetTags()
 snds = list(directory.extract())
-snds = map(fpc.transform, snds)
-snds = map(tags.transform, snds)
-snds = map(ess.transform, snds)
+snds = pooled(fpc.transform, snds)
+snds = list(pooled(tags.transform, snds))
+# snds = pooled(ess.transform, snds)
 map(lambda x: x.put(), snds)
 print snds[-1].to_json()
