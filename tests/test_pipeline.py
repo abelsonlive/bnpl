@@ -17,7 +17,10 @@ snds = pooled(taglib.GetTags().transform, snds)
 # snds = pooled(essentia.FreeSound().transform, snds)
 
 # store in s3/es
-snds = map(lambda x: x.put(), snds)
+def put(s):
+	return s.put()
+
+snds = list(pooled(put, snds))
 
 # log
 print snds[-1].to_json()

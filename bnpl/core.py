@@ -228,12 +228,8 @@ class Sound(Config):
     self.properties = properties
     self.properties.update(_properties)
 
-  @property 
-  def filename(self):
-    """
-    generate a filename for a sound
-    """
-    # blah
+  @property
+  def slug(self):
     try:
       assert('format' in self.properties)
     except:
@@ -248,7 +244,16 @@ class Sound(Config):
     f = frmt[:-1].strip()
     if not f:
       f = slugify(unicode(".".join(self.path.split('/')[-1].split('.')[:-1])).lower())
-    fn = f + "." + self.properties['format'] + '.' +  self.config['bnpl']['file_compression']
+    return f
+
+  @property 
+  def filename(self):
+    """
+    generate a filename for a sound
+    """
+    # blah
+
+    fn = self.slug + "." + self.properties['format'] + '.' +  self.config['bnpl'].get('file_compression', '')
 
     # handle no compression
     if fn.endswith('.'):
@@ -343,15 +348,19 @@ class Sound(Config):
     Create/Replace a file 
     """
     self.is_local = False
-    return self.file_store.put(self)
+    self.created_at = now()
+    self.updated_at = now()
+    self.file_store.put(self)
+    return self
 
   def file_mv(self):
     """
     Create/Replace a file in the file store 
     """
     if self.path_exists():
-      self.file_put()
+      sound = self.file_put()
       self.path_rm()
+      return sound
 
   def file_rm(self):
     """
@@ -419,18 +428,18 @@ class Sound(Config):
     """
     Save file + record. remove path.
     """
+    self.created_at = now()
+    self.updated_at = now()
     self.file_put()
     self.record_put()
     return self
-    # return parallel([self.file_put, self.record_put]) 
 
   def rm(self):
     """
     Remove file + record
     """
     self.file_rm()
-    return self.record_rm()
-    # return parallel([self.file_rm, self.record_rm])
+    self.record_rm()
 
 
 # core storage object
