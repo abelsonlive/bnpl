@@ -93,7 +93,7 @@ class ElasticRecordStore(Store):
   """
   
   """
-  es = Elasticsearch(config['elastic']['urls'])
+  es = Elasticsearch()
   index = config['elastic']['index']
   doc_type = config['elastic']['doc_type']
 
@@ -129,10 +129,10 @@ class ElasticRecordStore(Store):
     if not self.exists(sound):
       sound.created_at = now()
       sound.updated_at = now()
-    self.es.update(index=self.index, 
+    self.es.index(index=self.index, 
                   doc_type=self.doc_type, 
                   id=sound.uid,
-                  body=dict(doc=sound.to_dict()))
+                  body=sound.to_dict())
 
   def rm(self, sound):
     """
@@ -380,9 +380,7 @@ class Sound(Config):
     """
     Create/Replace a record 
     """
-    out = self.record_store.put(self)
-    self.path = p 
-    return out
+    return self.record_store.put(self)
 
   def record_rm(self):
     """

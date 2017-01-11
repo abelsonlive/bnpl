@@ -6,6 +6,7 @@ from bnpl.util import shell
 from bnpl.util import here
 from bnpl.util import yml_file_to_obj, obj_to_yml, json_to_obj
 from bnpl.core import Transformer
+from bnpl.exc import TransformerError
 
 class FreeSound(Transformer):
 
@@ -28,7 +29,7 @@ class FreeSound(Transformer):
     proc = shell(cmd)
     if not proc.ok: 
 
-        raise Exception("Error running: {0}\n{1}".format(cmd, proc.stdout))
+        raise TransformerError("Error running: {0}\n{1}".format(cmd, proc.stdout))
 
     # grab output files
     # frames = json_file_to_obj(oframes)
