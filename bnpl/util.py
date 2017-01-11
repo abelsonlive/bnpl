@@ -2,10 +2,10 @@
 self contained utlities
 should not reference other modules here
 """
-# import gevent.monkey
-# gevent.monkey.patch_socket()
-# import gevent
-# from gevent.pool import Pool
+import gevent.monkey
+gevent.monkey.patch_socket()
+import gevent
+from gevent.pool import Pool
 
 import os
 import re

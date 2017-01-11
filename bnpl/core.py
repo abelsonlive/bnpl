@@ -10,8 +10,6 @@ import s3plz
 from unidecode import unidecode
 from slugify import slugify
 from elasticsearch import Elasticsearch
-import requests
-
 
 from bnpl.util import here, get_config, flatten, async, pooled, uid, obj_to_json, now
 
@@ -54,7 +52,8 @@ class S3FileStore(Store):
   s3 = s3plz.connect(config['aws']['s3_bucket'], 
                      key=config['aws']['key'], 
                      secret=config['aws']['secret'],
-                     serializer=config['bnpl']['file_compression'])
+                     serializer=config['bnpl']['file_compression'],
+                     public=config['aws']['s3_public'])
 
   def get(self, sound):
     """
@@ -105,17 +104,17 @@ class ElasticRecordStore(Store):
     """
     Get a sound from ElasticSearch
     """
-    # hit = self.es.get(index=self.index, 
-    #                   doc_type=self.doc_type, id=sound.uid)
-    # return self._sound_from_hit(hit)
+    hit = self.es.get(index=self.index, 
+                      doc_type=self.doc_type, id=sound.uid)
+    return self._sound_from_hit(hit)
 
   def mget(self, sounds):
     """
     """
-    # res = self.es.mget(index=self.index, 
-    #                    doc_type=self.doc_type,
-    #                    ids=[sound.uid for sound in sounds])
-    # return self._sounds_from_res(res)
+    res = self.es.mget(index=self.index, 
+                       doc_type=self.doc_type,
+                       ids=[sound.uid for sound in sounds])
+    return self._sounds_from_res(res)
 
   def query(self, query):
     """
@@ -130,10 +129,6 @@ class ElasticRecordStore(Store):
     """
     Upsert a record
     """
-    if not self.exists(sound):
-      sound.created_at = now()
-
-    sound.updated_at = now()
     self.es.index(index=self.index, 
                   doc_type=self.doc_type, 
                   id=sound.uid,
@@ -167,6 +162,7 @@ class ElasticRecordStore(Store):
     Refresh the infex.
     """
     return self.es.indices.refresh(index=self.index)
+
 
   def _format_bulk(self, sound):
     """
@@ -243,7 +239,7 @@ class Sound(Config):
     for k in self.config['bnpl']['file_path_keys']:
       v = getattr(self, k, self.properties.get(k, None))
       if v:
-        frmt += "{0}{1}".format(slugify(str(v).lower()), self.config['bnpl']['file_path_delim'])
+        frmt += slugify(unicode(v).lower()) + self.config['bnpl']['file_path_delim']
     f = frmt[:-1].strip()
     if not f:
       f = slugify(".".join(self.path.split('/')[-1].split('.')[:-1])).lower()

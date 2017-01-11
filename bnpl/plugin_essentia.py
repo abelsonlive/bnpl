@@ -1,4 +1,5 @@
 import os
+import math
 from datetime import datetime
 
 from bnpl.core import Option
@@ -15,11 +16,11 @@ class FreeSound(Transformer):
 
     """
     self.params.setdefault('freesound_path', 
-                            here(__file__, 'ext/{0}/essentia-streaming-extractor-freesound')
+                            here(__file__, 'ext/{0}/essentia-streaming-freesound-extractor')
                                             .format(self.config['platform']))
     
     # configure
-    o = here(__file__, '{0}-freesound-output'.format(datetime.now().isoformat()))
+    o = '/tmp/{0}-freesound-output'.format(datetime.now().isoformat())
     oframes = o + "_frames.json"
     ostats = o + "_statistics.yaml"
 
@@ -46,7 +47,7 @@ class FreeSound(Transformer):
 
     """
     properties = {
-        "bpm": output.get('rhythm',{}).get('bpm', None),
+        "bpm": math.round(output.get('rhythm',{}).get('bpm',0), 1),
         "key": output.get('tonal', {}).get('key_key', '') + output.get('tonal', {}).get('key_scale', ''),
         "chord": output.get('tonal', {}).get('chord_key', '') + output.get('tonal', {}).get('chord_scale', '')
     }
