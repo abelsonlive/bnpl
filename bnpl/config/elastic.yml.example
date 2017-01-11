@@ -1,4 +1,6 @@
   
 elastic:
-  url: http://127.0.0.1:9200
-  
+  index: bnpl 
+  doc_type: sounds
+  urls: 
+    - http://es-host.es.amazonaws.com:80
