@@ -1,4 +1,5 @@
 from bnpl.util import here, pooled
+from bnpl.core import config
 from bnpl import plugin_file as file
 from bnpl import plugin_fpcalc as fpcalc
 from bnpl import plugin_essentia as essentia
@@ -14,13 +15,14 @@ snds = pooled(fpcalc.UID().transform, snds)
 snds = pooled(taglib.GetTags().transform, snds)
 
 # get bpm/key
-# snds = pooled(essentia.FreeSound().transform, snds)
+if config['platform'] == 'linux':
+  snds = pooled(essentia.FreeSound().transform, snds)
 
 # store in s3/es
 def put(s):
-	return s.put()
+  return s.put()
 
-snds = list(pooled(put, snds))
-
-# log
-print snds[-1].to_json()
+# print results
+for snd in snds:
+  snd.put()
+  print snd.to_json()

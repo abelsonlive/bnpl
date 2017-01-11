@@ -148,6 +148,7 @@ class ElasticRecordStore(Store):
                           doc_type=self.doc_type, 
                           id=sound.uid)
 
+  @retry(attempts=3)
   def exists(self, sound):
     """
     Delete a record
@@ -155,13 +156,14 @@ class ElasticRecordStore(Store):
     return self.es.exists(index=self.index, 
                           doc_type=self.doc_type, 
                           id=sound.uid)
-
+  @retry(attempts=3)
   def bulk(self, sounds):
     """
     Bulk load sounds
     """
     return self.es.bulk(body="\n".join([self._format_bulk(sound) for sound in sounds]))
 
+  @retry(attempts=3)
   def refresh(self):
     """
     Refresh the infex.
@@ -290,6 +292,7 @@ class Sound(Config):
     return {
       "uid": self.uid,
       "path": self.path,
+      "slug": self.slug,
       "filename": self.filename,
       "url": self.url,
       "is_local": self.is_local,

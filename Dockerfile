@@ -1,7 +1,7 @@
 FROM ubuntu:latest
 MAINTAINER Brian Abelson
 RUN apt-get update -y --fix-missing
-RUN apt-get install -y python-pip python-dev build-essential git vim ntp libtag1-dev
+RUN apt-get install -y python-pip python-dev build-essential git vim ntp jq libtag1-dev
 COPY bnpl/*.py /app/bnpl/
 COPY bnpl/ext /app/bnpl/ext/
 COPY bnpl/config /app/bnpl/config/
