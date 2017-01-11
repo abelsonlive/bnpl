@@ -1,5 +1,0 @@
-# this is where you store your s3 secrets
-s3:
-  bucket: 's3://bnpl'
-  key: ''
-  secret: ''

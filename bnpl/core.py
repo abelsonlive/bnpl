@@ -10,6 +10,7 @@ import s3plz
 from unidecode import unidecode
 from slugify import slugify
 from elasticsearch import Elasticsearch
+import requests
 
 
 from bnpl.util import here, get_config, flatten, async, pooled, uid, obj_to_json, now
@@ -50,9 +51,9 @@ class S3FileStore(Store):
   """
   Blob Store works with s3 / local directory
   """
-  s3 = s3plz.connect(config['s3']['bucket'], 
-                     key=config['s3']['key'], 
-                     secret=config['s3']['secret'],
+  s3 = s3plz.connect(config['aws']['s3_bucket'], 
+                     key=config['aws']['key'], 
+                     secret=config['aws']['secret'],
                      serializer=config['bnpl']['file_compression'])
 
   def get(self, sound):
@@ -66,8 +67,11 @@ class S3FileStore(Store):
     put a sound into the blob store
     """
     if not self.exists(sound):
+      sound.is_local = False
       with open(sound.path, 'rb') as f:
-        return self.s3.put(f.read(), sound.url)
+        self.s3.put(f.read(), sound.url)
+      return sound
+
 
   def rm(self, sound):
     """
@@ -93,7 +97,7 @@ class ElasticRecordStore(Store):
   """
   
   """
-  es = Elasticsearch()
+  es = Elasticsearch(config['elastic']['urls'])
   index = config['elastic']['index']
   doc_type = config['elastic']['doc_type']
 
@@ -101,17 +105,17 @@ class ElasticRecordStore(Store):
     """
     Get a sound from ElasticSearch
     """
-    hit = self.es.get(index=self.index, 
-                      doc_type=self.doc_type, id=sound.uid)
-    return self._sound_from_hit(hit)
+    # hit = self.es.get(index=self.index, 
+    #                   doc_type=self.doc_type, id=sound.uid)
+    # return self._sound_from_hit(hit)
 
   def mget(self, sounds):
     """
     """
-    res = self.es.mget(index=self.index, 
-                       doc_type=self.doc_type,
-                       ids=[sound.uid for sound in sounds])
-    return self._sounds_from_res(res)
+    # res = self.es.mget(index=self.index, 
+    #                    doc_type=self.doc_type,
+    #                    ids=[sound.uid for sound in sounds])
+    # return self._sounds_from_res(res)
 
   def query(self, query):
     """
@@ -128,17 +132,13 @@ class ElasticRecordStore(Store):
     """
     if not self.exists(sound):
       sound.created_at = now()
-      sound.updated_at = now()
-      return self.es.index(index=self.index, 
-                    doc_type=self.doc_type, 
-                    id=sound.uid,
-                    body=sound.to_dict())
 
     sound.updated_at = now()
-    return self.es.update(index=self.index, 
+    self.es.index(index=self.index, 
                   doc_type=self.doc_type, 
                   id=sound.uid,
-                  body={"doc":sound.to_dict()})
+                  body=sound.to_dict())
+    return sound
 
   def rm(self, sound):
     """
@@ -341,8 +341,8 @@ class Sound(Config):
     """
     Create/Replace a file 
     """
-    if self.path_exists():
-      return self.file_store.put(self)
+    self.is_local = False
+    return self.file_store.put(self)
 
   def file_mv(self):
     """
@@ -419,7 +419,7 @@ class Sound(Config):
     Save file + record. remove path.
     """
     self.file_put()
-    return self.record_put()
+    self.record_put()
     # return parallel([self.file_put, self.record_put]) 
 
   def rm(self):

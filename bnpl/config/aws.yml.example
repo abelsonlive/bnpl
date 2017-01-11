@@ -1,0 +1,5 @@
+# this is where you store your s3 secrets
+aws:
+  s3_bucket: ""
+  key: ""
+  secret: ""

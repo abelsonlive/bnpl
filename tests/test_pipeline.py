@@ -5,10 +5,12 @@ from bnpl import plugin_essentia as essentia
 
 FIXTURES = here(__file__, 'fixtures')
 
-directory = file.Directory(path=FIXTURES)
-ess = essentia.FreeSound()
+directory = file.Directory(path='fixtures/')
+# ess = essentia.FreeSound()
 fpc = fpcalc.UID()
 snds = list(directory.extract())
-snd = fpc.transform(snds[0])
-snd.put()
-print snd.properties.keys()
+snds = map(fpc.transform, snds)
+for s in snds:
+	s.put()
+
+print snds[0].to_json()
