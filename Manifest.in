@@ -1,0 +1,4 @@
+
+include LICENSE requirements.txt VERSION README.md MANIFEST.in Makefile .travis.yml .gitignore setup.py Dockerfile config/secrets.yml
+recursive-include *.yml
+global-exclude *.pyc .DS_Store
