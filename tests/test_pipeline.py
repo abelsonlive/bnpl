@@ -14,10 +14,10 @@ snds = pooled(fpcalc.UID().transform, snds)
 snds = pooled(taglib.GetTags().transform, snds)
 
 # get bpm/key
-snds = pooled(essentia.FreeSound().transform, snds)
+# snds = pooled(essentia.FreeSound().transform, snds)
 
 # store in s3/es
-map(lambda x: x.put(), list(snds))
+snds = map(lambda x: x.put(), snds)
 
 # log
 print snds[-1].to_json()

@@ -421,6 +421,7 @@ class Sound(Config):
     """
     self.file_put()
     self.record_put()
+    return self
     # return parallel([self.file_put, self.record_put]) 
 
   def rm(self):
