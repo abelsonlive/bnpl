@@ -1,42 +1,49 @@
 import os
-import math
 from datetime import datetime
 
-from bnpl.core import Option
-from bnpl.util import shell
-from bnpl.util import here
-from bnpl.util import yml_file_to_obj, obj_to_yml, json_to_obj
+from bnpl import util
+from bnpl.core import config
+from bnpl.core import Option, OptionSet
 from bnpl.core import Transformer
 from bnpl.exc import TransformerError
 
+
 class FreeSound(Transformer):
+  
+  options = OptionSet(
+    Option('freesound_path', type='path', required=True,
+          default=util.path_here(__file__, 'ext/{0}/essentia-streaming-freesound-extractor')\
+                                            .format(config['platform'])),
+    Option('load_frames', type="boolean", default=False)
+  )
 
-  def transform(self, sound):
+  def run(self, sound):
     """
 
     """
-    self.options.setdefault('freesound_path', 
-                            here(__file__, 'ext/{0}/essentia-streaming-freesound-extractor')
-                                            .format(self.config['platform']))
-    
     # configure
-    o = '/tmp/{0}-freesound-output'.format(datetime.now().isoformat())
+    o = '/tmp/{0}-freesound-output'.format(util.ts_now())
     oframes = o + "_frames.json"
     ostats = o + "_statistics.yaml"
 
     # cmd 
-    cmd = "{freesound_path} '{0}' '{1}'".format(sound.path, o, **self.options)
-    proc = shell(cmd)
+    cmd = "{freesound_path} '{0}' '{1}'".format(sound.path, o, **self.options.to_dict())
+    proc = util.sys_exec(cmd)
     if not proc.ok: 
-
-        raise TransformerError("Error running: {0}\n{1}".format(cmd, proc.stdout))
+      raise TransformerError("Error running: {0}\n{1}".format(cmd, proc.stdout))
 
     # grab output files
-    # frames = json_file_to_obj(oframes)
-    stats = self._parse_output(yml_file_to_obj(ostats))
-    os.remove(ostats)
-    os.remove(oframes)
-    
+    stats = self._parse_output(util.dict_from_yml_file(ostats))
+    if self.options['load_frames']:
+      frames = util.dict_from_json_file(oframes)
+
+    # remove
+    try:
+      util.path_remove(ostats)
+      util.path_remove(oframes)
+    except:
+      pass
+
     # update sound
     sound.properties.update(stats)
     return sound
@@ -46,7 +53,7 @@ class FreeSound(Transformer):
 
     """
     properties = {
-        "bpm": math.round(output.get('rhythm',{}).get('bpm',0), 1),
+        "bpm": round(output.get('rhythm',{}).get('bpm',0), 1),
         "key": output.get('tonal', {}).get('key_key', '') + output.get('tonal', {}).get('key_scale', ''),
         "chord": output.get('tonal', {}).get('chord_key', '') + output.get('tonal', {}).get('chord_scale', '')
     }

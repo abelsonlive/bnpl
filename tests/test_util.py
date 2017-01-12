@@ -1,24 +1,23 @@
 from bnpl import util
 from bnpl.core import config
 from bnpl import plugin_file as file
-from bnpl import plugin_fpcalc as fpcalc 
-from bnpl import plugin_taglib as taglib 
+from bnpl import plugin_fpcalc as fpcalc
 from bnpl import plugin_essentia as essentia
+from bnpl import plugin_taglib as taglib 
 
 # extract sounds from a directory
-extract = file.Directory(path=util.path_here(__file__, 'fixtures'))
-
-snds = extract.run()
+snds = file.Directory(path=path_here(__file__, 'fixtures')).extract()
 
 # run UID transform
-snds = util.exec_pooled(fpcalc.UID().run, snds)
+snds = pooled(fpcalc.UID().transform, snds)
 
 # get tags
-snds = util.exec_pooled(taglib.GetTags().run, snds)
+snds = pooled(taglib.GetTags().transform, snds)
 
 # get bpm/key
+# TODO: fix mac osx
 if config['platform'] == 'linux':
-  snds = util.exec_pooled(essentia.FreeSound().run, snds)
+  snds = pooled(essentia.FreeSound().transform, snds)
 
 # store in s3/es
 def put(s):

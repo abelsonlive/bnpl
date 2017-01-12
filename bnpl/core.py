@@ -8,12 +8,11 @@ import copy
 
 import s3plz
 from unidecode import unidecode
-from slugify import slugify
 from elasticsearch import Elasticsearch
 
-from bnpl.util import here, get_config, flatten, async, pooled, uid, obj_to_json, now, retry
+from bnpl import util
 
-config = get_config(os.getenv('BNPL_CONFIG', here(__file__, 'config/')))
+config = util.sys_get_config(os.getenv('BNPL_CONFIG', util.path_here(__file__, 'config/')))
 
 # configurations mixin.
 class Config(object):
@@ -54,14 +53,14 @@ class S3FileStore(Store):
                      secret=config['aws']['secret'],
                      serializer=config['bnpl']['file_compression'])
 
-  @retry(attempts=3)
+  @util.exec_retry(attempts=3)
   def get(self, sound):
     """
     get sound byes from the blob store.
     """
     return self.s3.get(sound.url)
 
-  @retry(attempts=3)
+  @util.exec_retry(attempts=3)
   def put(self, sound):
     """
     put a sound into the blob store
@@ -72,7 +71,7 @@ class S3FileStore(Store):
         self.s3.put(f.read(), sound.url)
       return sound
 
-  @retry(attempts=3)
+  @util.exec_retry(attempts=3)
   def rm(self, sound):
     """
     Remove a sound from the blob store
@@ -86,12 +85,12 @@ class S3FileStore(Store):
     """
     return self.s3.exists(sound.url)
 
-  @retry(attempts=3)
+  @util.exec_retry(attempts=3)
   def bulk(self, sounds, size=10):
 
     for sound in sounds:
       self.put(sound)
-    # for snd in pooled(self.put, sounds):
+    # for snd in util.exec_pooled(self.put, sounds):
     #   pass
 
 
@@ -128,7 +127,7 @@ class ElasticRecordStore(Store):
                          body=query)
     return self._sounds_from_res(res)
 
-  @retry(attempts=3)
+  @util.exec_retry(attempts=3)
   def put(self, sound):
     """
     Upsert a record
@@ -139,7 +138,7 @@ class ElasticRecordStore(Store):
                   body=sound.to_dict())
     return sound
 
-  @retry(attempts=3)
+  @util.exec_retry(attempts=3)
   def rm(self, sound):
     """
     Delete a record
@@ -148,7 +147,7 @@ class ElasticRecordStore(Store):
                           doc_type=self.doc_type, 
                           id=sound.uid)
 
-  @retry(attempts=3)
+  @util.exec_retry(attempts=3)
   def exists(self, sound):
     """
     Delete a record
@@ -156,14 +155,14 @@ class ElasticRecordStore(Store):
     return self.es.exists(index=self.index, 
                           doc_type=self.doc_type, 
                           id=sound.uid)
-  @retry(attempts=3)
+  @util.exec_retry(attempts=3)
   def bulk(self, sounds):
     """
     Bulk load sounds
     """
     return self.es.bulk(body="\n".join([self._format_bulk(sound) for sound in sounds]))
 
-  @retry(attempts=3)
+  @util.exec_retry(attempts=3)
   def refresh(self):
     """
     Refresh the infex.
@@ -195,8 +194,6 @@ class ElasticRecordStore(Store):
       yield self._sound_from_hit(hit)
 
 
-
-
 class Sound(Config):
   """
   A sound is initialized by recieving a path and a list of arbitrary parameters.
@@ -216,10 +213,12 @@ class Sound(Config):
 
   def  __init__(self, **properties):
     self.path = properties.pop('path','')
-    self.uid = properties.pop('uid', uid(self.path))
-    self.is_local = not self.path.startswith('s3://')
-    self.created_at = properties.pop('created_at', None) 
-    self.updated_at = properties.pop('updated_at', None) 
+    self.is_local = util.path_check(self.path)
+    self.uid = properties.pop('uid', util.string_to_uid(self.path))
+    self.created_at = util.date_from_any(properties.pop('created_at', None))
+    self.updated_at = util.date_from_any(properties.pop('updated_at', None))
+    self.format = properties.pop('format', util.path_get_ext(self.path))
+    self.mimetype = properties.pop('mimetype', util.path_get_mimetype_from_ext(self.path))
     self._set_properties(properties)
 
   def _set_properties(self, properties):
@@ -242,10 +241,11 @@ class Sound(Config):
     for k in self.config['bnpl']['file_path_keys']:
       v = getattr(self, k, self.properties.get(k, None))
       if v:
-        frmt += slugify(unicode(v).lower()) + self.config['bnpl']['file_path_delim']
+        frmt += util.string_to_slug(v) + self.config['bnpl']['file_path_delim']
     f = frmt[:-1].strip()
     if not f:
-      f = slugify(unicode(".".join(self.path.split('/')[-1].split('.')[:-1])).lower())
+      path = ".".join(util.path_get_filename(self.path).split('.')[:-1])
+      f = util.string_to_slug(unidecode(path).lower())
     return f
 
   @property 
@@ -255,7 +255,7 @@ class Sound(Config):
     """
     # blah
 
-    fn = self.slug + "." + self.properties['format'] + '.' +  self.config['bnpl'].get('file_compression', '')
+    fn = self.slug + "." + self.format + '.' +  self.config['bnpl'].get('file_compression', '')
 
     # handle no compression
     if fn.endswith('.'):
@@ -283,7 +283,7 @@ class Sound(Config):
     """
     if self.uid is None:
       raise ValueError('You must include a uid when saving a sound')
-    return "{0}/{1}/{2}".format(self.config['bnpl']['file_dir'], self.uid, self.filename)
+    return "{0}/{1}/sound.{2}".format(self.config['bnpl']['file_dir'], self.uid, self.format)
 
   def to_dict(self):
     """
@@ -292,6 +292,8 @@ class Sound(Config):
     return {
       "uid": self.uid,
       "path": self.path,
+      "format": self.format,
+      "mimetype": self.mimetype,
       "slug": self.slug,
       "filename": self.filename,
       "url": self.url,
@@ -308,14 +310,19 @@ class Sound(Config):
     d = self.to_dict()
     p = d.pop('properties', {})
     d.update(p)
-    return flatten(d)
+    return util.dict_flatten(d)
 
   def to_json(self):
     """
     Sound as json.
     """
-    return obj_to_json(self.to_dict())
+    return util.dict_to_json(self.to_dict())
 
+  def to_yml(self):
+    """
+    Sound as yml.
+    """
+    return util.dict_to_yml(self.to_dict())
 
   # local file storage
 
@@ -339,7 +346,6 @@ class Sound(Config):
     """
     return os.path.exists(self.path)
 
-
   def file_get(self):
     """
     Get a file.
@@ -350,9 +356,8 @@ class Sound(Config):
     """
     Create/Replace a file 
     """
-    self.is_local = False
-    self.created_at = now()
-    self.updated_at = now()
+    self.created_at = util.date_now()
+    self.updated_at = util.date_now()
     self.file_store.put(self)
     return self
 
@@ -362,6 +367,7 @@ class Sound(Config):
     """
     if self.path_exists():
       sound = self.file_put()
+      sound.is_local = False
       self.path_rm()
       return sound
 
@@ -369,17 +375,18 @@ class Sound(Config):
     """
     delete a file.
     """
-    return self.file_store.rm(self)
+    self.file_store.rm(self)
+    return self
 
   def file_dl(self):
     """
     Download a file 
     """
-
-    with open(self.tempfilename, 'wb') as f:
+    fp = copy.copy(self.tempfilename)
+    with open(fp, 'wb') as f:
       f.write(self.file_store.get(self))
-    self.path = copy.copy(self.tempfilename)
-    return self.path
+    self.path = fp
+    return self
 
   def file_exists(self):
     """
@@ -431,8 +438,9 @@ class Sound(Config):
     """
     Save file + record. remove path.
     """
-    self.created_at = now()
-    self.updated_at = now()
+    if not self.exists():
+      self.created_at = util.date_now()
+    self.updated_at = util.date_now()
     self.file_put()
     self.record_put()
     return self
@@ -474,18 +482,158 @@ class Store(Config):
     raise NotImplemented
 
 
+
 class Option(Config): 
+  """
+  Options for Plugins
+  """
+  parsers = {
+    'null': util.null_prepare,
+    'string': util.string_prepare,
+    'boolean': util.boolean_prepare,
+    'integer': util.integer_prepare,
+    'float': util.integer_prepare,
+    'date': util.date_prepare,
+    'ts': util.ts_prepare,
+    'dict': util.dict_prepare,
+    'list': util.list_prepare,
+    'set': util.set_prepare,
+    'path': util.path_prepare,
+    'regex': util.regex_prepare
+  }
   def __init__(self, name, **kwargs):
     self.name = name
     self.type = kwargs.get('type', 'string')
     self.default = kwargs.get('default', None)
+    self.required = kwargs.get('required', False)
+    self.help = kwargs.get('help', '')
+    self.value = None
+
+  def prepare(self, val=None):
+    """
+    Prepare an option.
+    """
+    if not val and self.default:
+      self.value = copy.copy(self.default)
+    else:
+      self.value = val 
+    self.value = self.parsers.get(self.type)(self.value)
+    if not self.value and self.required:
+      raise ValueError('Missing required option: {0}'.format(self.name))
+    return self.value
+
+  def to_dict(self):
+    """
+    Render an option as a dictionary.
+    """
+    return {
+      'name': self.name,
+      'type': self.type,
+      'default': self.default,
+      'required': self.required
+    }
+
+  def to_json(self):
+    """
+    Render an option as json.
+    """
+    return util.dict_to_tml(self.to_dict())
+
+  def to_yml(self):
+    """
+    Render an option as yml.
+    """
+    return util.dict_to_yml(self.to_dict())
+
+
+class OptionSet(Config):
+  """
+
+  """
+  defaults = [
+    Option("help", type="boolean", default=False)
+  ]
+
+  def __init__(self, *opts, **kwargs):
+    self._parsers = {}
+    self._options = {}
+    self._required = []
+    opts = [o for o in opts]
+    opts.extend(self.defaults)
+
+    for opt in opts:
+      self._parsers[opt.name] = opt
+      if opt.required and not opt.default:
+        self._required.append(opt.name)
+
+  def prepare(self, **raw):
+    """
+    Prepare a list of key/value options
+    """
+    for name, opt in self._parsers.iteritems():
+      value = opt.prepare(raw.get(name, opt.default))
+      self._options[name] = value
+      setattr(self, name, value)
+
+    # check required 
+    for name in self._required:
+      if name not in self._options:
+        raise ValueError("Missing required option: {0}".format(name))
+
+  def to_dict(self):
+    """
+    """
+    return self._options
+
+  def to_json(self):
+    """
+
+    """
+    return util.dict_to_json(self.to_dict())
+
+  def to_yml(self):
+    """
+
+    """
+    return util.dict_to_yml(self.to_dict())
+
+  def __getitem__(self, item):
+    """
+    """
+    return self.to_dict().get(item)
 
 
 class Plugin(Config):
   
-  # TODO:
+  options = OptionSet(Option("help", type="boolean", default=False))
+
   def __init__(self, **options):
-    self.options = options 
+    """
+
+    """
+    self.load_options(**options)
+
+  def run(self, *args, **kwargs):
+    """
+    """
+
+  def load_options(self, **options):
+    """
+
+    """
+    self.options.prepare(**options)
+
+  def load_cli_options(self):
+    """
+    load options from cli
+    """
+    self.load_options(**util.cli_read_options())
+
+  def load_api_options(self):
+    """
+    load options from api request 
+    """
+    self.load_options(**util.api_read_options())
 
 
 class Exporter(Plugin):

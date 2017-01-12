@@ -41,11 +41,11 @@ The idea is to string pipelines together through three core plugin objects:
 
 ## TODO 
 
+- [x] Create "Options" object for declaring inputs to Plugins
+- [ ] Execute plugins via CLI 
+- [ ] Execute plugins via API
 - [ ] Fix Mac OS X Essentia Installation 
 - [ ] DIY BPM / Pitch Detection? Can we get speed Increases ?
-- [ ] Create "Options" object for declaring inputs to Plugins
-- [ ] String together plugins via command line 
-- [ ] Execute plugins via API.
 - [ ] ElasticSearch Plugin for searching sounds
 - [ ] React App for browsing / listening / uploading sounds.
 - [ ] Massive Import

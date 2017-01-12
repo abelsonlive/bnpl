@@ -7,3 +7,6 @@ pytaglib
 elasticsearch
 gevent
 requests
+pytz
+iso8601
+tzlocal

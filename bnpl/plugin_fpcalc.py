@@ -1,21 +1,30 @@
-from bnpl.util import shell, uid, here, json_to_obj
+from bnpl import util
+from bnpl.core import Option, OptionSet
+from bnpl.core import config
 from bnpl.core import Transformer
 from bnpl.exc import TransformerError
 
+
 class UID(Transformer):
+  
+  options = OptionSet(
+    Option('fpcalc_path', type="path",
+            default=util.path_here(__file__, 'ext/{0}/chromaprint-fpcalc'.format(config['platform'])))
+  )
 
-  def transform(self, sound):
-    self.options.setdefault('fpcalc_path', here(__file__, 'ext/{0}/chromaprint-fpcalc'.format(self.config['platform'])))
+  def run(self, sound):
+    """
+    """
 
-    cmd = "{fpcalc_path} {0} -json".format(sound.path, **self.options)
-    p = shell(cmd)
+    # run command
+    cmd = "{0} '{1}' -json".format(self.options['fpcalc_path'], sound.path)
+    p = util.sys_exec(cmd)
     if not p.ok:
-      raise TransformerError(p.stdout)
+      raise TransformerError("Error running {0}: {1}".format(cmd, p.stdout))
+    d = util.dict_from_json(p.stdout)
 
-    d = json_to_obj(p.stdout)
-    
     # update sounds properties
     if 'fingerprint' in d:
-      sound.uid = uid(fingerprint=d.get('fingerprint', None))
+      sound.uid = util.string_to_uid(fingerprint=d.get('fingerprint', None))
     sound.properties.update(d)
     return sound
