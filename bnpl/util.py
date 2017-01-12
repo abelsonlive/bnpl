@@ -188,7 +188,7 @@ def string_prepare(s):
   try:
     if not s:
       return s
-    return unidecode(unicode(s))
+    return unicode(unidecode(str(s)))
   except Exception as s:
     raise ValueError('Invalid string type: {0}:\nTraceback:{1}'.format(s, error_tb()))
 
@@ -211,15 +211,19 @@ def string_camel_case_to_slug(string, delim=STRING_SLUG_DELIMITER):
   """
   covert camel to slug case
   """
+  if not string:
+    print "NONE", string 
+    return
   replace = '\1' + delim + '\2'
-  return re.sub('([a-z0-9])([A-Z])', replace, re.sub('(.)([A-Z][a-z]+)', replace, string)).lower()
+  string = re.sub('(.)([A-Z][a-z]+)', replace, string)
+  return re.sub('([a-z0-9])([A-Z])', replace, string).lower()
 
 def string_to_slug(string, delim=STRING_SLUG_DELIMITER, convert_camel=True):
   """
   slugify a string, handling camelcasing
   """
-  if convert_camel:
-    string = string_camel_case_to_slug(string, delim=delim)
+  # if convert_camel:
+  #   string = string_camel_case_to_slug(string, delim=delim)
   string = slugify(string_prepare(string))
   if delim is not '-':
     string = string.replace('-', delim)

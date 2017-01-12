@@ -241,7 +241,7 @@ class Sound(Config):
     for k in self.config['bnpl']['file_path_keys']:
       v = getattr(self, k, self.properties.get(k, None))
       if v:
-        frmt += util.string_to_slug(v) + self.config['bnpl']['file_path_delim']
+        frmt += str(v) + self.config['bnpl']['file_path_delim']
     f = frmt[:-1].strip()
     if not f:
       path = ".".join(util.path_get_filename(self.path).split('.')[:-1])
