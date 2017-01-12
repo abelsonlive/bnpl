@@ -460,7 +460,7 @@ def ts_from_date(dt):
   """
 
   """
-  return int(dt.strfrime('%s'))
+  return int(dt.strftime('%s'))
 
 def ts_to_date(ts):
   """
