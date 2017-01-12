@@ -34,9 +34,12 @@ See [tests/test_pipeline.py](tests/test_pipline.py) for now.
 
 The idea is to string pipelines together through three core plugin objects:
 
-`extractors` - takes options and returns one or more sounds (i.e. a directory or a iTunes XML file or an ElasticSearch query)
-`transformers` - takes a sound and options returns one or more sounds
-`exporters` - takes a list of sounds and options returns a link to a single file or archive of files representing all of these sounds (i.e. a directory or a iTunes XML file).
+* `extractors` 
+	- takes options and returns one or more sounds (i.e. a directory or a iTunes XML file or an ElasticSearch query)
+* `transformers`
+	 - takes a sound and options returns one or more sounds
+* `exporters` 
+	- takes a list of sounds and options returns a link to a single file or archive of files representing all of these sounds (i.e. a directory or a iTunes XML file).
 
 
 ## TODO 
