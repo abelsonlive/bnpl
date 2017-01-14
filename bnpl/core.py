@@ -804,7 +804,7 @@ class Plugin(ConfigMixin):
     """
 
     """
-    return self.__doc__
+    return self.__doc__.replace("\n", " ").strip()
 
   def to_dict(self):
     """

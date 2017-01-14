@@ -168,11 +168,8 @@ def string_camel_case_to_slug(string, delim=STRING_SLUG_DELIMITER):
   """
   covert camel to slug case
   """
-  if not string:
-    return
-  replace = '\1' + delim + '\2'
-  string = re.sub('(.)([A-Z][a-z]+)', replace, string)
-  return re.sub('([a-z0-9])([A-Z])', replace, string).lower()
+  string = re.sub('(.)([A-Z][a-z]+)',  r'\1_\2', string)
+  return re.sub('([a-z0-9])([A-Z])',  r'\1_\2', string).lower().replace('_', STRING_SLUG_DELIMITER)
 
 def string_to_slug(string, delim=STRING_SLUG_DELIMITER, convert_camel=True):
   """

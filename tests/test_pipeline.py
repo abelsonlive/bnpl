@@ -29,5 +29,5 @@ if config['platform'] == 'linux':
 imp = Importer()
 print imp.describe()
 for sound in imp.run(sounds):
-  print sound.to_json()
+  print sound.url
 
