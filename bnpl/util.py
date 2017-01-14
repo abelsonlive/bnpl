@@ -22,6 +22,7 @@ from datetime import datetime, date
 from inspect import isgenerator
 from functools import wraps
 from traceback import format_exc
+from collections import OrdererdDict
 from StringIO import StringIO
 
 import requests
@@ -33,6 +34,7 @@ from flask import request
 from flask import make_response
 from flask import Response
 from flask import send_file
+from functools import partial
 from werkzeug.utils import secure_filename
 
 import iso8601
@@ -40,49 +42,10 @@ from unidecode import unidecode
 from tzlocal import get_localzone
 
 ##########################################
-# CONSTANTS
-##########################################
-
-CLI_FILE_FORMATS = [
-    'yml', 'yaml', 'json'
-]
-
-##########################################
-# DEFAULTS
-##########################################
-
-LIST_DELIMITER = ','
-STRING_SLUG_DELIMITER = '-'
-
-# boolean parsing.
-BOOLEAN_TRUE_VALUES = [
-  'y', 'yes', '1', 't', 'true', 'on', 'ok'
-]
-
-BOOLEAN_FALSE_VALUES = [
-  'n', 'no', '0', 'f', 'false', 'off', ''
-]
-
-NULL_STRING = ''
-
-NULL_VALUES = [
-  'null', 'na', 'n/a', 'nan', 'none'
-]
-
-MIMETYPE_DEFAULT = 'application/octet-stream'
-
-##########################################
-# REGEXES
-##########################################
-RE_TYPE = type(re.compile(r''))
-RE_CLI_ARG = re.compile(r'^[\'\"]?(.*)[\'\"]?$')
-RE_NUMERIC = re.compile(r'[0-9\.\,]+')
-
-##########################################
 # JSON UTILITES
 ##########################################
 
-def json_serializer(o):
+def json_serialize(o):
 
   """
   obj > json
@@ -121,7 +84,7 @@ def json_serializer(o):
   data = _encoder().encode(o)
   return data
 
-def json_deserializer(s):
+def json_deserialize(s):
   """
   json > obj
   """
@@ -147,11 +110,15 @@ def yml_deserializer(s):
 # NULL UTILITIES
 ##########################################
 
+NULL_VALUES = [
+  'null', 'na', 'n/a', 'nan', 'none', ''
+]
+
 def null_prepare(s):
   """
   prepare a string
   """
-  if check_string(s) and s.lower() in NULL_VALUES: 
+  if string_check(s) and s.lower() in NULL_VALUES: 
     return None
   elif not s: 
     return None 
@@ -161,25 +128,15 @@ def null_check(s):
   """
   check if an item is a string.
   """
-  if not s or (check_string(s) and s.lower() in NULL_VALUES): 
+  if not s or (string_check(s) and s.lower() in NULL_VALUES): 
     return True
   return False
-
-def null_to_string(n):
-  """
-  format a null string; placeholder
-  """
-  return NULL_STRING 
-
-def null_from_string(s):
-  """
-  placeholder
-  """
-  return None 
 
 ##########################################
 # STRING UTILITIES
 ##########################################
+
+STRING_SLUG_DELIMITER = '_'
 
 def string_prepare(s):
   """
@@ -233,6 +190,8 @@ def string_to_slug(string, delim=STRING_SLUG_DELIMITER, convert_camel=True):
 # INTEGER UTILITIES
 ##########################################
 
+re_integer = re.compile(r'^(\-)?[0-9]+$')
+
 def integer_prepare(s):
   """
 
@@ -240,20 +199,20 @@ def integer_prepare(s):
   try:
     return int(s)
   except:
-    raise ValueError("Invalid int type: {0}".format(s))
+    raise ValueError("Invalid integer type: {0}".format(s))
 
 def integer_check(s):
   """
   """
-  try:
-    s = int(s)
-    return True
-  except Exception as e: 
-    return False
+  if isinstance(s, int):
+    return True 
+  return re_integer.match(str(s)) is not None
 
 ##########################################
 # FLOAT UTILITIES
 ##########################################
+
+re_float = re.compile('^(\-)?[0-9\.]+$')
 
 def float_prepare(s):
   """
@@ -267,43 +226,31 @@ def float_prepare(s):
 def float_check(s):
   """
   """
-  try:
-    s = float(s)
-    return True
-  except Exception as e: 
-    return False
-
-def float_to_string(s):
-  """
-  placeholder
-  """
-  return unicode(str(s))
-
-def float_from_string(s):
-  """
-  placeholder
-  """
-  return float(s)
+  if isinstance(s, float):
+    return True 
+  return re_float.match(str(s))
 
 ##########################################
 # BOOLEAN UTILITIES
 ##########################################
+
+BOOLEAN_TRUE_VALUES = [
+  'y', 'yes', 't', 'true', 'on', 'ok', 'si', 'oui'
+]
+
+BOOLEAN_FALSE_VALUES = [
+  'n', 'no', 'f', 'false', 'off', 'non'
+]
 
 def boolean_prepare(b):
   """
   prepare a boolean type
   """
   if string_check(b):
-    if b in BOOLEAN_TRUE_VALUES:
+    if str(b) in BOOLEAN_TRUE_VALUES:
       return True 
-    if b in BOOLEAN_FALSE_VALUES:
+    if str(b) in BOOLEAN_FALSE_VALUES:
       return False 
-
-  if integer_check(b) or float_check(b):
-    if b == 0:
-      return False 
-    if b == 1:
-      return True 
 
   if boolean_check(b):
     return b 
@@ -481,30 +428,35 @@ def dict_prepare(d):
   """
   prepare a dict
   """
-  try:
-    if dict_check(d):
-      return d  
+  if not d:
+    return {}
+  if dict_check(d, strict=True):
+    return d  
 
-    if string_check(d):
-      return dict_from_yml(d) # works for yml + json 
-
-    if list_check(d):
-      return dict_from_list(d)
+  try: 
+    dict_from_yml(d)
 
   except Exception as e:
     raise ValueError("Invalid dict type: {0}\nTraceback:{1}".format(d, error_tb()))
 
-def dict_check(d):
+def dict_check(d, strict=True):
   """
   check if an object is a dict
   """
-  return isinstance(d, collections.MappingType)
+  test = isinstance(d, collections.MappingType)
+  if test or strict:
+    return test 
+  try: 
+    dict_from_yml(d)
+    return True 
+  except:
+    return False
 
 def dict_from_json(s):
   """
   
   """
-  return json_deserializer(s)
+  return json_deserialize(s)
 
 def dict_from_yml(s):
   """
@@ -512,69 +464,17 @@ def dict_from_yml(s):
   """
   return yml_deserializer(s)
 
-def dict_from_json_file(p):
-  """
-  json file to dict
-  """
-  return dict_from_json(open(p).read())
-
-def dict_from_yml_file(p):
-  """
-  yml file -> dict
-  """
-  return yml_deserializer(open(p).read())
-
-def dict_from_string(s):
-  """ 
-  alias
-  """
-  return dict_from_yml(s)
-
-def dict_from_list(d):
-  """
-  must be a list of lists with to items
-  """
-  if len(d[0]) == 2:
-    return dict(d)
-  raise ValueError('Invalid list type for dict converstion: {0}'.format(d))
-
 def dict_to_json(d):
   """
   dict > json string
   """
-  return json_serializer(d)
+  return json_serialize(d)
 
 def dict_to_yml(d):
   """
   dict -> yml string
   """
   return yml_serializer(d)
-
-def dict_to_string(d):
-  """ 
-  alias for dict_to_json
-  """
-  return dict_to_json(d)
-
-def dict_to_list(d):
-  """
-  convert a dict to a list of key value pairs
-  """
-  return [[k,v] for k,v in d.iteritems()]
-
-def dict_to_json_file(d, p):
-  """
-  dict to json file
-  """
-  with open(p, 'wb') as f:
-    f.write(dict_to_json(d))
-
-def dict_to_yml_file(d, p):
-  """
-  dict > yml file 
-  """
-  with open(p, 'wb') as f:
-    f.write(dict_to_yml(d))
 
 def dict_flatten(d, parent_key='', sep='_'):
   """
@@ -611,156 +511,189 @@ def dict_update(d, u, overwrite=False):
 # LIST UTILITIES
 ##########################################
 
-def list_prepare(lst, delim=LIST_DELIMITER):
+LIST_DELIMITER = ','
+
+def list_prepare(lst, delim=LIST_DELIMITER, type="stirng"):
   """
   Prepare a lst.
   """
-  if list_check(lst):
+  if lst is None:
+    return []
+
+  if list_check(lst, strict=True):
     return lst 
 
-  if set_check(lst):
-    return set_to_list(lst)
+  try:
+    return list_from_string(lst, delim=delim, type=type)
+  except:
+    raise ValueError('Invalid list type: {0}'.format(lst))
 
-  if string_check(lst):
-    return list_to_string(lst, delim=delim)
-
-  raise ValueError('Invalid list type: {0}'.format(lst))
-
-def list_check(lst):
+def list_check(lst, strict=True):
   """
   check if an object is a list
   """
-  return isinstance(lst, collections.Iterable)
+  test = isinstance(lst, collections.Iterable)
+  if test or strict:
+    return test 
+  return _list_check_delim(lst, min=2) or _list_check_brackets(lst)
 
-def _list_determine_delim(str, default=LIST_DELIMITER):
+def list_from_string(s, delim=LIST_DELIMITER, type="string"):
   """
-  intelligently determine list delimiter
+  typed list from delimited string
   """
-  pipes = str.count('|')
-  commas = str.count(',')
-  if pipes > 0 and pipes > comma:
-    return '|'
-  if commas > 0 and comma > pipes:
-    return ','
-  return default
+  if _list_check_brackets(s):
+    try:
+      return json_deserialize(s)
+    except:
+      # remove brackets
+      s = s.strip()[1:-1]
 
-def list_from_string(string, delim=LIST_DELIMITER, items=string_prepare):
-  """
-  list from delimited string
-  """
+  # check delimiter
   if not delim:
-    delim = _list_determine_delim(string, default=delim)
-  return [items(i.strip()) for i in string.split(delim) if i.strip()]
+    delim = _list_check_delim(s, default=LIST_DELIMITER)
 
-def list_from_json(string):
-  """
-  list from json
-  """
-  lst =  dict_from_json(string)
-  if list_check(lst):
-    return lst 
-  raise ValueError('Invalid json list type: {0}'.format(string))
+  # parse items
+  return Type(type).prepare(filter(lambda x: x.strip() is not None, s.split(delim)))
 
-def list_to_string(lst, delim=','):
+def list_to_string(lst, delim=LIST_DELIMITER, brackets=False):
   """
   list to delimited string
   """
-  return delim.join([unicode(i) for i in lst])
+  string = delim.join(map(lst, str))
+  if brackets:
+    return "[{0}]".format(string)
+  return string
 
 def list_to_json(lst):
   """
   list to json
   """
-  return dict_to_json(lst)
+  return json_serialize(lst)
 
-def list_to_uniq(seq, idfun=lambda x: x):
-    """
-    Order-preserving unique function.
-    """
-    # order preserving
-    seen = {}
-    result = []
+def list_to_yml(lst):
+  """
+  list to json
+  """
+  return yml_serializer(lst)
+
+def list_to_jsonl(lst, exec=False):
+  """
+  list to jsonl
+  """
+  def _jsonl():
+    for i in lst:
+      yield "{0}\n".format(json_serialize(i))
+  return _gen(_jsonl(), exec)
+
+def list_to_uniq(seq, idfun=lambda x: x, exec=False):
+  """
+  Order-preserving unique function.
+  """
+  # order preserving
+  def _uniq():
+    seen = set()
     for item in seq:
-        marker = idfun(item)
-        if marker in seen:
-            continue
-        seen[marker] = 1
-        result.append(item)
-    return result
+      marker = idfun(item)
+      if marker in seen:
+        continue
+      seen.add(marker)
+      yield item 
 
-def list_to_chunks(l, n=100):
-    """
-    Yield successive n-sized chunks from l.
-    """
-    for i in xrange(0, len(l), n):
-        yield l[i:i+n]
+  return _gen(_uniq(), exec)
 
-def list_flatten(lst):
+def list_to_chunks(l, n=100, exec=False):
+  """
+  Yield successive n-sized chunks from l.
+  """
+  itr = (l[i:i+n] for i in xrange(0, len(l), n))
+  return _gen(itr, exec)
+
+def list_flatten(l, exec=False):
   """
   flatten a list.
   """
-  for item in lst:
-    if isisntance(item, list):
-      for lst2 in list_flatten(item):
-        for item2 in lst2:
-          yield item2
-    else:
-      yield item
+  def _flatten(l):
+    for i in l:
+      if check_list(i, strict=True):
+        for l2 in _flatten(i):
+          for i2 in l2:
+            yield i2
+      else:
+        yield i
+
+  return _gen(_flatten(), exec)
+
+def _list_check_brackets(s):
+  """
+  """
+  return (s.startswith('[') and s.startswith(']'))
+
+def _list_check_delim(s, min=1, default=LIST_DELIMITER):
+  """
+  intelligently determine list delimiter
+  """
+  pipes = s.count('|')
+  commas = s.count(',')
+  if pipes > commas:
+    return '|'
+  if commas > pipes:
+    return ','
+  if (pipes + commas) <= 1:
+    return None
+  return default
+
+def _gen(items, exec=False):
+  """
+  """
+  if exec and isgenerator(items):
+    return list(items)
+  return items
 
 ##########################################
 # SET UTILITIES
 ##########################################
 
-def set_prepare(st):
+def set_prepare(st, delim=LIST_DELIMITER, type="string"):
   """
   Prepare a set type
   """
-  if list_check(st):
-    return set_from_list(st)
+  if set_check(st, strict=True):
+    return st 
+
+  if list_check(st, strict=True):
+    return list(st)
 
   if string_check(st):
-    return set_from_string(st)
-
-  if set_check(st):
-    return st 
+    return set_from_string(st, delim=delim, type=type)
 
   raise ValueError('Invalid set type: {0}'.format(st))
 
-def set_check(st):
+def set_check(st, strict=True):
   """
   check if an object is a set.
   """
-  return isinstance(st, (set, frozenset))
+  test = isinstance(st, (set, frozenset))
+  if test or strict:
+    return test 
+  return list_check(st, strict=strict)
 
-def set_from_list(lst):
-  """
-  set from list
-  """
-  return set(lst)
-
-def set_from_string(string):
+def set_from_string(string, **kwargs):
   """
   set from delimted string
   """
-  return set_from_list(list_from_string(string))
+  return set(list_from_string(string, **kwargs))
 
 def set_from_json(st):
   """
   set from json string
   """
-  return set_from_list(list_from_json(st))
+  return set(list_from_json(st))
 
-def set_to_list(st):
-  """
-  set to list
-  """
-  return list(st)
-
-def set_to_string(string):
+def set_to_string(st, **kwargs):
   """
   set to delimited string
   """
-  return list_to_string(set_to_list(string))
+  return list_to_string(list(st), **kwargs)
 
 def set_to_json(st):
   """
@@ -773,15 +706,17 @@ def set_to_json(st):
 # PATH UTILITIES 
 ##########################################
 
+MIMETYPE_DEFAULT = 'application/octet-stream'
+
 def path_prepare(p):
   """
   Prepare a path type.
   """
   p = path_make_abs(p)
-  if path_check(p):
-    return p 
-  raise ValueError('Invalid path type: {0}'.format(p))
-
+  if not path_check(p)
+   raise ValueError('Invalid path type: {0}'.format(p))
+  return p 
+ 
 def path_check(p):
   """
   Check if a path exists.
@@ -798,7 +733,9 @@ def path_make_abs(p):
   """
   make a path absolute
   """
-  return os.path.abspath(os.path.expanduser(p))
+  if p.startswith('~'):
+    p = os.path.expanduser(p)
+  return os.path.abspath(p)
 
 def path_here(f, *args):
   """
@@ -833,19 +770,19 @@ def path_get_mimetype(path, lookup={}, default=MIMETYPE_DEFAULT):
   """
   get a filepath's mimetype.
   """
-  mime = path_get_mimetype_from_ext(path, lookup, default=None)
+  mime = _path_get_mimetype_from_ext(path, lookup, default=None)
   if not mime:
-    mime = path_guess_mimetype(path, default=default)
+    mime = _path_guess_mimetype(path, default=default)
   return mime 
 
-def path_get_mimetype_from_ext(path, lookup={}, default=MIMETYPE_DEFAULT):
+def _path_get_mimetype_from_ext(path, lookup={}, default=MIMETYPE_DEFAULT):
   """
   get a filepath's mimetype.
   """
   ext = path_get_ext(path_make_abs(path))
   return lookup.get(ext.lower(), default)
 
-def path_guess_mimetype(path, default=MIMETYPE_DEFAULT):
+def _path_guess_mimetype(path, default=MIMETYPE_DEFAULT):
   """
   guess mimetype from filepath
   """
@@ -857,20 +794,25 @@ def path_guess_mimetype(path, default=MIMETYPE_DEFAULT):
 # REGEX UTILITIES 
 ##########################################
 
+RegexType = type(re.compile(r''))
+
 def regex_prepare(s):
   """
   
   """
-  return re.compile(s)
+  try:
+    return re.compile(s)
+  except:
+    raise ValueError("Invalud regex type: {0}".format(s))
 
 def regex_check(s):
   """
 
   """
-  if isinstance(s, RE_TYPE):
+  if isinstance(s, RegexType):
     return True 
   try:
-    re.compile(s)
+    regex_prepare(s)
     return True 
   except:
     return False
@@ -883,9 +825,13 @@ def sys_get_platform():
   """
   Get the current platform
   """
+  p = sys.platform.lower()
   if 'linux' in sys.platform.lower():
     return 'linux'
-  return 'osx'
+  elif 'darwin' in p
+    return 'osx'
+  return 'win'
+
 
 def sys_get_env(package='bnpl'):
   """
@@ -1045,6 +991,10 @@ def sys_exec(cmd):
 # COMMAND LINE UTILITIES
 ##########################################
 
+# TODO configurable.
+cli_file_formats = set(['yml', 'yaml', 'json'])
+re_cli_arg = re.compile(r'^[\'\"]?(.*)[\'\"]?$')
+
 def cli_read_options(prog='bnpl'):
   """
   Parses arbitrary command-line args of the format:
@@ -1055,55 +1005,11 @@ def cli_read_options(prog='bnpl'):
   
   # get raw args
   parser = argparse.ArgumentParser(prog=prog)
-  opts, arg_strings = parser.parse_known_args()
-  opts = {"help": getattr(opts, 'help', False)}
-  
+  _, arg_strings = parser.parse_known_args()
+  opts = {}
   for arg_string in arg_strings:
-
-    # remove '--'
-    while True:
-      if arg_string.startswith('-'):  arg_string = arg_string[1:]
-      else: break
-    
-    # parse arg string
-    parts = arg_string.split("=")
-    key = string_to_slug(parts[0])
-    value = "=".join(parts[1:])
-
-    # assume this means a boolean flag
-    if len(parts) == 1:
-      opts[key] = True
-      break ;
-
-    # basic parsing
-    else:
-      m = RE_CLI_ARG.search(value)
-      if not m:
-        raise ValueError('Invalid command line arg: {0}'.format(arg_string))
-
-      # get value
-      value = m.group(0).strip()
-      
-      # check nulls
-      if null_check(value):
-        opts[key] = None
-
-      # load data file args
-      elif _cli_arg_is_data(value):
-        opts[key] = _cli_arg_load_data(value)
-
-      elif value.startswith("{") and value.endswith('}'):
-        try:
-          opts[key] = dict_from_json(value)
-        except:
-          pass 
-
-      elif value.startswith("[") and value.endswith(']'):
-        try:
-          opts[key] = list_from_json(value)
-        except:
-          pass 
- 
+    key, value = _cli_parse_arg_string (arg_string)
+    opts[key] = value
   return opts
 
 def cli_read_data():
@@ -1119,29 +1025,48 @@ def cli_write_data(output):
   """
   return sys_write_jsonl(output)
 
-def _cli_arg_is_data(path_or_string):
+def _cli_parse_arg_string(arg_string):
   """
-  determine if we can load a file from a cli arg.
   """
-  if not path_or_string: return False
-  for fmt in CLI_FILE_FORMATS:
-    ext = path_get_ext(path_or_string)
-    if path_or_string.lower().endswith(ext):
-      return True
-  return False
+  while True:
+    if arg_string.startswith('-'):  
+      arg_string = arg_string[1:]
+    else: 
+      break
+  
+  # parse arg string
+  parts = arg_string.split("=")
+  key = string_to_slug(parts[0], delim="_")
+  value = "=".join(parts[1:])
 
-def _cli_arg_load_data(path_or_string):
+  # assume this means a boolean flag
+  if len(parts) == 1:
+    return key, True
+  return key, _cli_arg_prepare(value)
+
+def _cli_arg_prepare(value):
   """
-  Load data in from a filepath or a string
   """
-  if not path_or_string:
-    return {}
-  try:
-    return dict_from_yml_file(path_or_string)
-  except Exception as e:
-    raise IOError(
-          "Could not read cli arg file '{}' \n{}"
-          .format(fp, e.message))
+  err = ValueError('Invalid command line arg: {0}'.format(value))
+  m = re_cli_arg.search(value)
+  if not m:
+    raise err
+
+  # get value
+  value = m.group(0).strip()
+  
+  # check nulls
+  if null_check(value):
+    return None
+
+  # check files 
+  if path_get_ext(value) in cli_file_formats:
+    value = open(value).read()
+    try:
+      return yml_deserializer(value)
+    except:
+      raise err
+  return value
 
 ##########################################
 # API UTILITIES
@@ -1151,7 +1076,7 @@ def api_read_options():
   """
   Get options from request.
   """
-  return dict(request.args.to_dict().items())
+  return request.args.to_dict()
 
 def api_read_data():
   """
@@ -1173,7 +1098,7 @@ def api_write_data(obj, status=200, headers={}):
   """
   Write data as json resposne
   """
-  data = dict_to_json(obj)
+  data = json_serialize(obj)
 
   # accept callback
   if 'callback' in request.args:
@@ -1184,22 +1109,24 @@ def api_write_data(obj, status=200, headers={}):
                   status=status,
                   mimetype='application/json')
 
-def api_read_file():
+def api_read_file(to_tmp=True):
   """
   Download file from request.
   """
   if 'file' not in request.files:
     return None 
 
-  file = request.files['file'] 
+  file = request.files.get('file', None)
   # if user does not select file, browser also
   # submit a empty part without filename
   if not file or file.filename == '':
-    raise ValueError('No selected file')
-  path = os.path.join('/tmp', secure_filename(file.filename))
-  format = path_get_ext(file.filename)
-  file.save(path)
-  return path 
+    return None
+  if to_tmp:
+    path = os.path.join('/tmp', secure_filename(file.filename))
+    file.save(path)
+    return path 
+  else:
+    return file.read()
 
 def api_write_file(path_or_byes, **kwargs):
   """
@@ -1236,21 +1163,25 @@ def error_tb():
 # EXECUTION UTILITIES
 ##########################################
 
-def exec_pooled(fn, itr, size=10):
+def exec_pooled(fn, itr, size=10, exec=False, **kwargs):
   """
   Pooled execution
   """
   p = Pool(size)
-  for resp in p.imap_unordered(fn, itr):
-    yield resp
+  fn = partial(fn, **kwargs)
+  items = p.imap_unordered(fn, itr)
+  if exec:
+    items = list(items)
+  return items
 
-def exec_async(*funcs, **kwargs):
+def exec_async(funcs=[], **kwargs):
   """
   Execute a list of functions in parallel.
   """ 
   def _exec(f):
+    f = partial(f, **kwargs)
     return f()
-  return pooled(_exec, funcs, **kwargs)
+  return exec_pooled(_exec, funcs, size=len(funcs), exec=True)
 
 def exec_retry(*dargs, **dkwargs):
   """

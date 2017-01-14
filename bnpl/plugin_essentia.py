@@ -11,10 +11,10 @@ from bnpl.exc import TransformerError
 class FreeSound(Transformer):
   
   options = OptionSet(
-    Option('freesound_path', type='path', required=True,
+    Option('freesound_path', type='path', required=True, help="local path to freesound binary"
           default=util.path_here(__file__, 'ext/{0}/essentia-streaming-freesound-extractor')\
                                             .format(config['platform'])),
-    Option('load_frames', type="boolean", default=False)
+    Option('load_frames', type="boolean", default=False, help="Whether or not to load frame analysis.")
   )
 
   def run(self, sound):
