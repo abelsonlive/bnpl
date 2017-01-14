@@ -6,25 +6,20 @@ from bnpl import plugin_taglib as taglib
 from bnpl import plugin_essentia as essentia
 
 # extract sounds from a directory
-extract = file.Directory(path=util.path_here(__file__, 'fixtures'))
-
-snds = extract.run()
+sounds = file.Directory(path=util.path_here(__file__, 'fixtures')).run()
 
 # run UID transform
-snds = util.exec_pooled(fpcalc.UID().run, snds)
+sounds = util.exec_pooled(fpcalc.UID().run, sounds)
 
 # get tags
-snds = util.exec_pooled(taglib.GetTags().run, snds)
+sounds = util.exec_pooled(taglib.GetTags().run, sounds)
 
 # get bpm/key
 if config['platform'] == 'linux':
-  snds = util.exec_pooled(essentia.FreeSound().run, snds)
+  sounds = util.exec_pooled(essentia.FreeSound().run, sounds)
 
-# store in s3/es
-def put(s):
-  return s.put()
+# store sounds
+sounds = list(util.exec_pooled(lambda x: x.put(), sounds))
+for sound in sounds:
+	print sound.to_json()
 
-# print results
-for snd in snds:
-  snd.put()
-  print snd.to_json()

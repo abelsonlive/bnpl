@@ -15,12 +15,14 @@ from bnpl import util
 config = util.sys_get_config(os.getenv('BNPL_CONFIG', util.path_here(__file__, 'config/')))
 
 # configurations mixin.
-class Config(object):
+class ConfigMixin(object):
+  """
+  """
   config = config 
 
 
 # core storage object
-class Store(Config):
+class Store(ConfigMixin):
 
 
   def put(self, sound):
@@ -194,7 +196,7 @@ class ElasticRecordStore(Store):
       yield self._sound_from_hit(hit)
 
 
-class Sound(Config):
+class Sound(ConfigMixin):
   """
   A sound is initialized by recieving a path and a list of arbitrary parameters.
   on update it can either overwrite existing parameters or only add those 
@@ -218,8 +220,13 @@ class Sound(Config):
     self.created_at = util.date_from_any(properties.pop('created_at', None))
     self.updated_at = util.date_from_any(properties.pop('updated_at', None))
     self.format = properties.pop('format', util.path_get_ext(self.path))
-    self.mimetype = properties.pop('mimetype', util.path_get_mimetype_from_ext(self.path))
+    self.mimetype = properties.pop('mimetype', self._get_mimetype(self.path))
     self._set_properties(properties)
+
+  def _get_mimetype(self, path):
+    """
+    """
+    return util.path_get_mimetype_from_ext(path, lookup=self.config['mimetypes']['lookup'])
 
   def _set_properties(self, properties):
     """
@@ -454,7 +461,7 @@ class Sound(Config):
 
 
 # core storage object
-class Store(Config):
+class Store(ConfigMixin):
 
 
   def put(self, sound):
@@ -483,7 +490,7 @@ class Store(Config):
 
 
 
-class Option(Config): 
+class Option(ConfigMixin): 
   """
   Options for Plugins
   """
@@ -546,7 +553,7 @@ class Option(Config):
     return util.dict_to_yml(self.to_dict())
 
 
-class OptionSet(Config):
+class OptionSet(ConfigMixin):
   """
 
   """
@@ -603,7 +610,7 @@ class OptionSet(Config):
     return self.to_dict().get(item)
 
 
-class Plugin(Config):
+class Plugin(ConfigMixin):
   
   options = OptionSet(Option("help", type="boolean", default=False))
 

@@ -14,6 +14,7 @@ class UID(Transformer):
 
   def run(self, sound):
     """
+    Run the UID transformation.
     """
 
     # run command
