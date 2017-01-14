@@ -22,7 +22,7 @@ from datetime import datetime, date
 from inspect import isgenerator
 from functools import wraps
 from traceback import format_exc
-from collections import OrdererdDict
+from collections import OrderedDict
 from StringIO import StringIO
 
 import requests
@@ -169,7 +169,6 @@ def string_camel_case_to_slug(string, delim=STRING_SLUG_DELIMITER):
   covert camel to slug case
   """
   if not string:
-    print "NONE", string 
     return
   replace = '\1' + delim + '\2'
   string = re.sub('(.)([A-Z][a-z]+)', replace, string)
@@ -430,6 +429,7 @@ def dict_prepare(d):
   """
   if not d:
     return {}
+
   if dict_check(d, strict=True):
     return d  
 
@@ -463,6 +463,12 @@ def dict_from_yml(s):
   yml string -> dict
   """
   return yml_deserializer(s)
+
+def dict_from_yml_file(p):
+  return dict_from_yml(open(p).read())
+
+def dict_from_json_file(p):
+  return dict_from_json(open(p).read())
 
 def dict_to_json(d):
   """
@@ -532,7 +538,7 @@ def list_check(lst, strict=True):
   """
   check if an object is a list
   """
-  test = isinstance(lst, collections.Iterable)
+  test = isinstance(lst, list) or isgenerator(lst)
   if test or strict:
     return test 
   return _list_check_delim(lst, min=2) or _list_check_brackets(lst)
@@ -576,16 +582,16 @@ def list_to_yml(lst):
   """
   return yml_serializer(lst)
 
-def list_to_jsonl(lst, exec=False):
+def list_to_jsonl(lst, _exec=False):
   """
   list to jsonl
   """
   def _jsonl():
     for i in lst:
       yield "{0}\n".format(json_serialize(i))
-  return _gen(_jsonl(), exec)
+  return _gen(_jsonl(), _exec)
 
-def list_to_uniq(seq, idfun=lambda x: x, exec=False):
+def list_to_uniq(seq, idfun=lambda x: x, _exec=False):
   """
   Order-preserving unique function.
   """
@@ -599,16 +605,16 @@ def list_to_uniq(seq, idfun=lambda x: x, exec=False):
       seen.add(marker)
       yield item 
 
-  return _gen(_uniq(), exec)
+  return _gen(_uniq(), _exec)
 
-def list_to_chunks(l, n=100, exec=False):
+def list_to_chunks(l, n=100, _exec=False):
   """
   Yield successive n-sized chunks from l.
   """
   itr = (l[i:i+n] for i in xrange(0, len(l), n))
-  return _gen(itr, exec)
+  return _gen(itr, _exec)
 
-def list_flatten(l, exec=False):
+def list_flatten(l, _exec=False):
   """
   flatten a list.
   """
@@ -621,7 +627,7 @@ def list_flatten(l, exec=False):
       else:
         yield i
 
-  return _gen(_flatten(), exec)
+  return _gen(_flatten(), _exec)
 
 def _list_check_brackets(s):
   """
@@ -642,10 +648,10 @@ def _list_check_delim(s, min=1, default=LIST_DELIMITER):
     return None
   return default
 
-def _gen(items, exec=False):
+def _gen(items, _exec=False):
   """
   """
-  if exec and isgenerator(items):
+  if _exec and isgenerator(items):
     return list(items)
   return items
 
@@ -712,16 +718,17 @@ def path_prepare(p):
   """
   Prepare a path type.
   """
-  p = path_make_abs(p)
-  if not path_check(p)
-   raise ValueError('Invalid path type: {0}'.format(p))
-  return p 
- 
-def path_check(p):
+  if not p:
+    return None
+  return path_make_abs(p)
+
+def path_check(p, strict=True):
   """
   Check if a path exists.
   """
-  return os.path.exists(path_make_abs(p))
+  if not p:
+    return False 
+  return string_check(p)
 
 def path_remove(p):
   """
@@ -733,9 +740,7 @@ def path_make_abs(p):
   """
   make a path absolute
   """
-  if p.startswith('~'):
-    p = os.path.expanduser(p)
-  return os.path.abspath(p)
+  return os.path.abspath(os.path.expanduser(p))
 
 def path_here(f, *args):
   """
@@ -750,11 +755,14 @@ def path_list(p):
   return (os.path.join(dp, f) for dp, dn, fn in
           os.walk(os.path.expanduser(p)) for f in fn)
 
-def path_get_filename(path):
+def path_get_filename(path, ext=True):
   """
   get the filename from a path.
   """
-  return path.split('/')[-1]
+  p = path.split('/')[-1]
+  if not ext:
+    p = p.replace('.{0}'.format(path_get_ext(p)), '')
+  return p
 
 def path_get_ext(path):
   """
@@ -828,7 +836,7 @@ def sys_get_platform():
   p = sys.platform.lower()
   if 'linux' in sys.platform.lower():
     return 'linux'
-  elif 'darwin' in p
+  elif 'darwin' in p:
     return 'osx'
   return 'win'
 
@@ -1163,16 +1171,17 @@ def error_tb():
 # EXECUTION UTILITIES
 ##########################################
 
-def exec_pooled(fn, itr, size=10, exec=False, **kwargs):
+def exec_pooled(fn, itr, size=10, _exec=False, **kwargs):
   """
   Pooled execution
   """
   p = Pool(size)
   fn = partial(fn, **kwargs)
-  items = p.imap_unordered(fn, itr)
-  if exec:
-    items = list(items)
-  return items
+  return map(fn, itr)
+  # items = p.imap_unordered(fn, itr)
+  # if _exec:
+  #   items = list(items)
+  # return items
 
 def exec_async(funcs=[], **kwargs):
   """
@@ -1181,7 +1190,7 @@ def exec_async(funcs=[], **kwargs):
   def _exec(f):
     f = partial(f, **kwargs)
     return f()
-  return exec_pooled(_exec, funcs, size=len(funcs), exec=True)
+  return exec_pooled(_exec, funcs, size=len(funcs), _exec=True)
 
 def exec_retry(*dargs, **dkwargs):
   """

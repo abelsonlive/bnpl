@@ -9,6 +9,7 @@ import copy
 import s3plz
 from unidecode import unidecode
 from elasticsearch import Elasticsearch
+from collections import OrderedDict
 
 from bnpl import util
 
@@ -233,7 +234,7 @@ class Sound(ConfigMixin):
     self.created_at = util.date_from_any(properties.pop('created_at', None))
     self.updated_at = util.date_from_any(properties.pop('updated_at', None))
     self.ext = properties.pop('format', util.path_get_ext(self.path))
-    self.mime = properties.pop('mimetype', self._get_mimetype(self.path))
+    self.mimetype = properties.pop('mimetype', self._get_mimetype(self.path))
     self._set_properties(properties)
 
   def _get_mimetype(self, path):
@@ -253,10 +254,10 @@ class Sound(ConfigMixin):
   def _format_slug_key(self, k):
     """
     """
-    v = str(getattr(self, k, self.properties.get(k, None)))
+    v = getattr(self, k, self.properties.get(k, None))
     if not v:
       return ""
-    return "{0}{slug_delim}".format(v, **self.config['bnpl'])
+    return "{0}{slug_delim}".format(util.string_to_slug(str(v)), **self.config['bnpl'])
 
   @property
   def slug(self):
@@ -407,16 +408,14 @@ class Sound(ConfigMixin):
       os.path.remove(self.path)
       return self
 
-  def fs_dl(self, to=self.tempfilename):
+  def fs_dl(self, to=None):
     """
     Download a file 
     """
-    with open(to, 'wb') as f:
+    self.path = to or self.tempfilename
+    with open(self.path, 'wb') as f:
       f.write(self.fs.get(self))
-    self.path = to
-    return self
-
-  # record storage
+    return self 
 
   def db_get(self):
     """
@@ -464,7 +463,7 @@ class Sound(ConfigMixin):
     """
     Remove file + record
     """
-    self.file_rm()
+    self.fs_rm()
     self.db_rm()
     return self
 
@@ -481,7 +480,7 @@ class Sound(ConfigMixin):
     if not self.exists():
       self.created_at = util.date_now()
     self.updated_at = util.date_now()
-    util.exec_async([self.file_put, self.db_put])
+    util.exec_async([self.fs_put, self.db_put])
     return self
 
 #########################################
@@ -489,7 +488,7 @@ class Sound(ConfigMixin):
 ########################################
 class Type(object):
 
-  _types = OrdererdDict(
+  _types = OrderedDict({
     'null': [util.null_prepare, util.null_check],
     'boolean': [util.boolean_prepare, util.boolean_check],
     'date': [util.date_prepare, util.date_check],
@@ -502,30 +501,26 @@ class Type(object):
     'path': [util.path_prepare, util.path_check],
     'regex': [util.regex_prepare, util.regex_check],
     'string': [util.string_prepare, util.string_check]
-  )
+  })
 
   def __init__(self, type="string"):
     self.type = type
     self.types = self._types.keys()
 
-  @classmethod
-  def prepare(cls, value, type=None):
+  def prepare(self, value, type=None):
     """
     """
-    func = cls._types[type or cls.type][0]
-    if isinstance(value, types.I terable):
-      return map(func, value)
+    func = self._types[type or self.type][0]
     return func(value)  
 
-  @classmethod
-  def check(cls, value, type=None):
+  def check(self, value, type=None):
     """
     """ 
-    func = cls._types[type or cls.type][1]
+    func = self._types[type or self.type][1]
     return func(value)
 
   @classmethod
-  def sniff(cls, value, types=[]):
+  def sniff(self, value, types=[]):
     """
     """
     if not len(types):
@@ -537,7 +532,7 @@ class Type(object):
           return cls.prepare(value, t)
         except:
           pass 
-    return cls._prepare(value, "string")
+    return cls.prepare(value, "string")
 
 
 class Option(ConfigMixin): 
@@ -573,7 +568,7 @@ class Option(ConfigMixin):
     if not self.value and self.required:
       raise ValueError('Missing required option: {0}'.format(self.name))
     if self.type == "list" and self.items:
-      self.value = map(self.value, Type(self.items).prepare)
+      self.value = map(Type(self.items).prepare, self.value)
     return self.value
 
   def to_dict(self):
@@ -622,60 +617,13 @@ class OptionSet(ConfigMixin):
   ]
 
   def __init__(self, *opts, **kwargs):
-    self._options = opts
+    self._options = [o for o in opts]
     self._parsers = {}
     self._parsed = {}
     self._aliases = {}
     self._required = []
     self._errors = []
     self._setup()
-
-  def prepare(self, **raw):
-    """
-    Prepare a list of key/value options
-    """
-    for name, value in self._map_aliases(**raw).iteritems():
-     
-      else:
-        try:
-          self._set_option(name, value)
-        except Exception as e:
-          self._errors.append("Invalid option '{0}': {1}.".format(e.message))
-    self._check_errors()
-    
-  def describe(self):
-    """
-    describe an OptionSet
-    """
-    return [o.describe() for o in self._options]
-
-  def to_dict(self):
-    """
-    Format options as a dictionary
-    """
-    d = {}
-    for o in self._opts:
-      v = o.describe()
-      v.pop('slug', None)
-      d[o.slug] = v
-    return d
-
-  def to_yml(self):
-    """
-    Format options as json.
-    """
-    return util.dict_to_yml(self.to_dict())
-
-  def to_json(self):
-    """
-    Render an option as json.
-    """
-    return util.dict_to_json(self.to_dict())
-
-  def __getitem__(self, item):
-    """
-    """
-    return self.to_dict().get(item)
 
   def _setup(self):
     """
@@ -688,12 +636,63 @@ class OptionSet(ConfigMixin):
     """
     """
     # required
+    self._parsers[opt.name] = opt.prepare
+
     if opt.required and not opt.default:
       self._required.append(opt.name)
 
     # aliases 
     if opt.alias:
       self._aliases[opt.alias] = opt.name
+
+  def _set_defaults(self):
+    """
+    set defaults.
+    """
+    for opt in self._options:
+      if opt.name not in self._parsed and opt.default:
+        self._set_option(opt.name, opt.default)
+
+  def prepare(self, **raw):
+    """
+    Prepare a list of key/value options
+    """
+    self._set_defaults()
+    for name, value in self._map_aliases(**raw).iteritems():
+      try:
+        self._set_option(name, value)
+      except ValueError as e:
+        self._errors.append("Invalid option: '{0}':'{1}' > {2}.".format(name, value, e.message))
+    self._check_errors()
+
+  def to_dict(self):
+    """
+    describe an OptionSet
+    """
+    return self._parsed
+
+  def describe(self):
+    """
+    Format options as a dictionary
+    """
+    return [o.describe() for o in self._options]
+
+  def to_yml(self):
+    """
+    Format options as json.
+    """
+    return util.dict_to_yml(self.to_dict())
+
+  def to_json(self):
+    """
+    Render an option as json.
+    """   
+    return util.dict_to_json(self.to_dict())
+
+  def __getitem__(self, item):
+    """
+    """
+    return self._parsed.get(item, None)
 
   def _map_aliases(self, **raw):
     """
@@ -708,7 +707,8 @@ class OptionSet(ConfigMixin):
   def _set_option(self, name, value):
     """
     """
-    value = self._parsers.get(name, Type.sniff)(value)
+    fn = self._parsers.get(name)
+    value = fn(value)
     self._parsed[name] = value
     setattr(self, name, value)
 
@@ -716,20 +716,23 @@ class OptionSet(ConfigMixin):
     """
     check required options
     """
-    missing = [name if name not in self._parsed for name in self._required]
+    missing = filter(lambda x: x not in self._parsed, self._required)
     n_missing = len(missing)
     if n_missing > 0:
-      return "Missing required option{0}: {1}"\
-                .format("s" if n_missing > 1 else "".  ", ".join(missing))
+      suffx = "s"
+      if n_missing <2:
+        suffx = ""
+      return True, "Missing required option{0}: {1}".format(suffx, ", ".join(missing))
+    return False, ""
 
   def _check_errors(self):
     """
     check for errors.
     """
     # check required
-    err = self._check_required()
+    err, msg = self._check_required()
     if err: 
-      self._errors.append(err)
+      self._errors.append(msg)
 
     if len(self._errors):
       message = "Invalid Option Set!\nErrors:\n{0}".format("\n".join(self._errors))
@@ -786,7 +789,7 @@ class Plugin(ConfigMixin):
     
     """
     self.file = None 
-    if self._context = 'api':
+    if self._context == 'api':
       self.file = util.api_read_file()
 
   @property
@@ -794,37 +797,42 @@ class Plugin(ConfigMixin):
     """
 
     """
-    return self.__class__.__name__
+    return util.string_camel_case_to_slug(self.__class__.__name__)
 
   @property
-  def slug(self):
+  def description(self):
     """
-    """
-    return util.string_camel_case_to_slug(self.name)
 
-  @property
+    """
+    return self.__doc__
+
   def to_dict(self):
     """
 
     """
-   return {
+    return {
       'name': self.name,
-      'slug': self.slug,
-      'description': self.__doc__,
+      'description': self.description,
       'type': self.type,
       'options': self.options.describe()
     }
+
+  def describe(self):
+    """
+    """
+    return self.to_dict()
 
   def run(self, *args, **kwargs):
     """
     """
     raise NotImplemented
 
-  def exec(self, *args, **kwargs):
+
+  def execute(self, *args, **kwargs):
     """
     For internal usage.
     """
-    return self.run() 
+    return self.run(*args, **kwargs) 
 
 
 class Extractor(Plugin):
@@ -861,16 +869,17 @@ class Importer(Plugin):
   """
 
   type = 'importer'
+
   options = OptionSet(
     Option('pool_size', type="integer", default=10)
   )
 
-  def run(self):
+  def run(self, sounds):
     """
     """
-    if not util.check_list(self.data, strict=True):
-      self.data = [self.data]
-    return util.exec_pooled(self._put_sound, self.data, size=self.options['pool_size'])
+    if not util.list_check(sounds, strict=True):
+      sounds = [sounds]
+    return util.exec_pooled(self._put_sound, sounds, size=self.options.pool_size)
   
   def _put_sound(self, sound):
     """
@@ -885,8 +894,8 @@ class Pipeline(Plugin):
   type = 'pipeline'
 
   options = OptionSet(
-    Option('extractors', type="dict", default={'extractor':{}})
-    Option('transformers', type="dict", default={})
-    Option('importers', type="dict", default={})
+    Option('extractors', type="dict", default={'extractor':{}}),
+    Option('transformers', type="dict", default={}),
+    Option('importers', type="dict", default={}),
     Option('exporters', type="dict", default={})
   )

@@ -5,9 +5,11 @@ from bnpl.core import Transformer
 
 
 class GetTags(Transformer):
-  
+  """
+  Set tags on a sound using taglib.
+  """
   options = OptionSet(
-    Option('tags', type='list',
+    Option('tags', type='list', items='string',
            default=['artist', 'album', 'title', 'genre', 'tracknumber', 'date'])
   )
 

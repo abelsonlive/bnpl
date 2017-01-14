@@ -6,6 +6,7 @@ from bnpl.core import Extractor
 
 class ItunesSongs(Extractor):
   """
+  Extract sounds from your Itunes Library.
   """
   options = OptionSet(
     Option('library_xml', type='path', required=True)
