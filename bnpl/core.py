@@ -229,10 +229,10 @@ class Sound(ConfigMixin):
 
   def  __init__(self, **properties):
     self.path = properties.pop('path','')
-    self.uid = properties.pop('uid', util.string_to_uid(self.path))
     self.created_at = util.date_from_any(properties.pop('created_at', None))
     self.updated_at = util.date_from_any(properties.pop('updated_at', None))
-    self.ext = properties.pop('format', util.path_get_ext(self.path))
+    self.ext = properties.pop('ext', util.path_get_ext(self.path))
+    self.uid = properties.pop('uid', util.string_to_uid(self.path)) + "." + self.ext
     self.mimetype = properties.pop('mimetype', self._get_mimetype(self.path))
     self._set_properties(properties)
 
@@ -298,11 +298,11 @@ class Sound(ConfigMixin):
     """
     if self.uid is None:
       raise ValueError('You must include a uid when saving a sound')
-    return "{0}/{1}/sound.{2}".format(self.config['bnpl']['file_dir'], self.uid, self.ext)
+    return "{0}/uid={1}/ext={2}/{1}.{2}".format(self.config['bnpl']['file_dir'], self.uid, self.ext)
 
   @property
   def is_local(self):
-    """
+    """               
     """
     return util.path_check(self.path)
 

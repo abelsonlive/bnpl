@@ -270,9 +270,9 @@ class Plugin(ConfigMixin):
   """
   type = "core"
 
-  options = OptionSet(
+  defaults = [
     Option("help", type="boolean", default=False, help="placeholder", reqired=False)
-  )
+  ]
 
   def __init__(self, data=[], _context="python", **options):
     """
@@ -382,7 +382,14 @@ class Plugin(ConfigMixin):
     }
 
   def to_json(self):
+    """
+    """
     return util.dict_to_json(self.to_dict())
+
+  def to_api(self):
+    """
+    """
+    return util.api_write_data(self.to_dict())
 
   def describe(self):
     """
@@ -446,31 +453,11 @@ class Extractor(Plugin):
   """
   type = 'extractor'
 
-
-class Transformer(Plugin):
-  """
-  Accepts a sound + parameters and returns a modified sound or one or more new sounds
-  """
-  type = 'transformer'
-
-class  Mixer(Plugin):
-  """
-  Accepts a sound + parameters and returns a modified sound or one or more new sounds
-  """
-  type = 'mixer'
-
-class Exporter(Plugin):
-
-  """
-  Accepts parameters and one or more sounds and returns a link to a file. 
-  """
-  type = 'exporter'
-
 class Importer(Plugin):
 
   """
-  stores one or more sounds. default behavior can be overridden by subclassing this object.
-  exists for consistency + coherence of plugin types within the pipeline context. 
+  Stores one or more sounds. 
+  Returns sounds with created / updated_at timestamps.
   """
 
   type = 'importer'
@@ -493,6 +480,33 @@ class Importer(Plugin):
       sound = Sound(**sound)
     return sound.put()
 
+class Deleter(object):
+  """
+
+  """
+  type = 'deleter'
+
+
+class Transformer(Plugin):
+  """
+  Accepts a sound + parameters and returns a modified sound or one or more new sounds
+  """
+  type = 'transformer'
+
+class  Mixer(Plugin):
+  """
+  Accepts sounds + parameters and returns a single sound.
+  """
+  type = 'mixer'
+
+class Exporter(Plugin):
+
+  """
+  Accepts parameters and one or more sounds and returns a link to a file. 
+  """
+  type = 'exporter'
+
+
 class Pipeline(Plugin):
   """
   A plugin that runs plugins.
@@ -511,16 +525,16 @@ class Factory(ConfigMixin):
 
   INTERNAL = [
     'Transformer', 'Exporter', 'Importer', 
-    'Extractor', 'Plugin', 'Pipeline'
+    'Extractor', 'Plugin', 'Pipeline', 'Deleter',
   ]
 
   def __init__(self):
     self._plugins = defaultdict(dict)
     self._factory = {}
-    self._factory['importer'] = Importer 
-    self._plugins['importer']['class'] = Importer 
-    self._plugins['importer']['module'] = 'core'
-    self._plugins['importer']['import_path'] = 'bnpl.Importer'
+    self._factory['core.importer'] = Importer 
+    self._plugins['core.importer']['class'] = Importer 
+    self._plugins['core.importer']['module'] = 'core'
+    self._plugins['core.importer']['import_path'] = 'bnpl.Importer'
     self._register_plugins()
 
   def describe(self):
@@ -529,6 +543,7 @@ class Factory(ConfigMixin):
     _l = []
     for nm, items in self._plugins.iteritems():
       d = self._factory[nm](_context="internal").describe()
+      d['name'] = nm
       d['import_path'] = items['import_path']
       d['module'] = items['module']
       _l.append(d)
@@ -538,9 +553,12 @@ class Factory(ConfigMixin):
     """
     """
     return {
-      '{module}.{name}'.format(**d):d for d in self.describe()
+      '{name}'.format(**d):d for d in self.describe()
     } 
 
+  def to_api(self):
+    return util.api_write_data(self.to_dict())
+  
   def to_json(self):
     """
     """
@@ -551,11 +569,15 @@ class Factory(ConfigMixin):
     """
     return util.dict_to_yml(self.to_dict())
 
-
   def __getitem__(self, key):
     """
     """
     return self._factory.get(key)
+
+  def get(self, key, default=None):
+    """
+    """
+    return self._factory.get(key, default)
 
   def __iter__(self):
     for _, obj in self._factory.iteritems():
@@ -607,6 +629,7 @@ class Factory(ConfigMixin):
         if import_path in self._plugins:
           continue
         nm = obj(_context="internal").name
+        nm = "{0}.{1}".format(module, nm)
         self._factory[nm] = obj
         self._plugins[nm]['class'] = obj 
         self._plugins[nm]['module'] = module 
