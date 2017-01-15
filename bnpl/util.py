@@ -28,6 +28,7 @@ from StringIO import StringIO
 import requests
 import yaml
 import pytz 
+import iso8601
 from slugify import slugify 
 from unidecode import unidecode
 from flask import request
@@ -37,9 +38,6 @@ from collections import Counter
 from flask import send_file
 from functools import partial
 from werkzeug.utils import secure_filename
-
-import iso8601
-from unidecode import unidecode
 from tzlocal import get_localzone
 
 ##########################################
@@ -146,7 +144,9 @@ def string_prepare(s):
   try:
     if not s:
       return s
-    return unicode(unidecode(str(s)))
+    if isinstance(s, unicode):
+      return unidecode(s)
+    return str(s)
   except Exception as s:
     raise ValueError('Invalid string type: {0}:\nTraceback:{1}'.format(s, error_tb()))
 
@@ -244,9 +244,9 @@ def boolean_prepare(b):
   prepare a boolean type
   """
   if string_check(b):
-    if str(b) in BOOLEAN_TRUE_VALUES:
+    if str(b).lower() in BOOLEAN_TRUE_VALUES:
       return True 
-    if str(b) in BOOLEAN_FALSE_VALUES:
+    if str(b).lower() in BOOLEAN_FALSE_VALUES:
       return False 
 
   if boolean_check(b):
@@ -534,7 +534,7 @@ def list_prepare(lst, delim=LIST_DELIMITER, type="stirng"):
 
 def list_check(lst, strict=True):
   """
-  check if an object is a list
+  check self.options.pathif an object is a list
   """
   test = isinstance(lst, list) or isgenerator(lst)
   if test or strict:
@@ -921,7 +921,7 @@ def sys_write_jsonl(o):
   """
   if list_check(o):
     for oo in o:
-      sys.stdout.write(dict_to_json(o) + "\n")
+      sys.stdout.write(dict_to_json(oo) + "\n")
     return
   sys.stdout.write(dict_to_json(o) + "\n")
   return

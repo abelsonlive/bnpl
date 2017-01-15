@@ -5,5 +5,5 @@ from bnpl.plugin import (
 	Factory
 )
 
-plugins = Factory()
-print plugins.to_json()
+# plugins = Factory()
+# print plugins.to_json()

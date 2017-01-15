@@ -6,9 +6,11 @@ from bnpl import util
 from bnpl.core import ConfigMixin 
 from bnpl.core import Sound
 
+
 ########################################
 # type utilies 
 ########################################
+
 class OptionType(object):
 
   _types = OrderedDict({
@@ -135,7 +137,7 @@ class OptionSet(ConfigMixin):
 
   """
   defaults = [
-    Option("help", type="boolean", default=False)
+    Option("help", type="boolean", default=False, required=False)
   ]
 
   def __init__(self, *opts, **kwargs):
@@ -177,6 +179,8 @@ class OptionSet(ConfigMixin):
     """
     """
     fn = self._parsers.get(name)
+    if not fn:
+      return
     try:
       value = fn(value)
       self._parsed[name] = value
@@ -265,12 +269,9 @@ class Plugin(ConfigMixin):
   Plugin description placeholder.
   """
   type = "core"
-  # overridden by factory.
-  _module = "core"
-  _import_path = "bnpl.plugin.Plugin"
 
   options = OptionSet(
-    Option("help", type="boolean", default=False, help="placeholder")
+    Option("help", type="boolean", default=False, help="placeholder", reqired=False)
   )
 
   def __init__(self, data=[], _context="python", **options):
@@ -281,7 +282,7 @@ class Plugin(ConfigMixin):
     self._load_options(**options)
     self._load_data(data)
     self._load_file()
-    self._load_sounds
+    self._load_sounds()
     self._errors = []
     # overwritten by Factory
 
@@ -329,7 +330,10 @@ class Plugin(ConfigMixin):
     if self.has_data:
       def __gen():      
         for sound in self.data:
-          yield Sound(**sound)
+          if isinstance(sound, Sound):
+            yield sound 
+          else:
+            yield Sound(**sound)
       self.sounds =  __gen()
 
     elif self.has_file:
@@ -366,31 +370,19 @@ class Plugin(ConfigMixin):
       d = ""
     return d.replace("\n", " ").strip()
 
-  @property
-  def module(self):
-    """
-    """
-    return self._module
-
-  @property
-  def import_path(self):
-    """
-    """
-    self._import_path
-
-
   def to_dict(self):
     """
 
     """
     return {
       'name': self.name,
-      'module': self.module,
-      'import_path': self.import_path,
       'description': self.description,
       'type': self.type,
       'options': self.options.describe()
     }
+
+  def to_json(self):
+    return util.dict_to_json(self.to_dict())
 
   def describe(self):
     """
@@ -402,6 +394,16 @@ class Plugin(ConfigMixin):
     """
     raise NotImplemented
 
+  def do(self, *args, **kwargs):
+    """
+    For internal usage.
+    """
+    if self.options._parsed.get("help", False):
+      output = self.describe()
+    else:
+      output = self._switch(*args, **kwargs)
+    return self._return(output)
+
   def _switch(self, *args, **kwargs):
     """
     determine execution
@@ -409,8 +411,7 @@ class Plugin(ConfigMixin):
     def _run():
       return self.run()
     
-    if self.type != 'extractor' and not self.has_data:
-      assert(isinstance(args[0], Sound))
+    if self.type != 'extractor' and type != 'pipeline' and not self.has_data:
       def _run():
         return self.run(args[0])
 
@@ -438,15 +439,6 @@ class Plugin(ConfigMixin):
     elif self._context == "cli":
       return util.cli_write_data(output)
 
-  def execute(self, *args, **kwargs):
-    """
-    For internal usage.
-    """
-    if self.options.help:
-      output = self.describe()
-    else:
-      output = self._switch(*args, **kwargs)
-    return self._return(output)
 
 class Extractor(Plugin):
   """
@@ -509,12 +501,13 @@ class Pipeline(Plugin):
     Option('exporters', type="dict", default={})
   )
 
-
 class Factory(ConfigMixin):
+
   INTERNAL = [
     'Transformer', 'Exporter', 'Importer', 
     'Extractor', 'Plugin', 'Pipeline'
   ]
+
   def __init__(self):
     self._plugins = defaultdict(dict)
     self._factory = {}
@@ -553,6 +546,10 @@ class Factory(ConfigMixin):
     """
     """
     return self._factory.get(key)
+
+  def __iter__(self):
+    for _, obj in self._factory.iteritems():
+      yield obj
 
   def _register_plugins(self):
     """
