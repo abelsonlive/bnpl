@@ -1,4 +1,4 @@
 
-from bnpl.core import Extractor
-from bnpl.core import Sound
+from bnpl import Extractor
+from bnpl import Sound
 

@@ -1,17 +1,18 @@
 from bnpl import util
-from bnpl.core import Option, OptionSet
-from bnpl.core import config
-from bnpl.core import Transformer
+from bnpl import Option, OptionSet
+from bnpl import Config
+from bnpl import Transformer
 from bnpl.exc import TransformerError
 
+
+DEFAULT_PATH = util.path_here(__file__, 'ext/{0}/chromaprint-fpcalc'.format(Config['platform']))
 
 class UID(Transformer):
   """
   Use chromaprint's fpcalc to assign a sound uid.
   """
   options = OptionSet(
-    Option('fpcalc_path', type="path", required=True,
-            default=util.path_here(__file__, 'ext/{0}/chromaprint-fpcalc'.format(config['platform'])))
+    Option('fpcalc_path', type="path", required=True, default=DEFAULT_PATH)
   )
 
   def run(self, sound):

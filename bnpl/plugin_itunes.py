@@ -1,7 +1,7 @@
 from pyItunes import Library
 
-from bnpl.core import Option, OptionSet
-from bnpl.core import Extractor
+from bnpl import Option, OptionSet
+from bnpl import Extractor
 
 
 class ItunesSongs(Extractor):

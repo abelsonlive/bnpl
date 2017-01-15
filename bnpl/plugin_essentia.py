@@ -1,20 +1,17 @@
-import os
-from datetime import datetime
-
 from bnpl import util
-from bnpl.core import config
-from bnpl.core import Option, OptionSet
-from bnpl.core import Transformer
+from bnpl import Config, Option, OptionSet, Transformer
 from bnpl.exc import TransformerError
 
 
 class FreeSound(Transformer):
   
   options = OptionSet(
-    Option('freesound_path', type='path', required=True, help="local path to freesound binary",
-          default=util.path_here(__file__, 'ext/{0}/essentia-streaming-freesound-extractor')\
-                                            .format(config['platform'])),
-    Option('load_frames', type="boolean", default=False, help="Whether or not to load frame analysis.")
+    Option('freesound_path', type='path', required=True, 
+            help="Local path to freesound binary",
+            default=util.path_here(__file__, 'ext/{0}/essentia-streaming-freesound-extractor')\
+                                            .format(Config['platform'])),
+    Option('load_frames', type="boolean", default=False, 
+           help="Whether or not to load frame analysis.")
   )
 
   def run(self, sound):

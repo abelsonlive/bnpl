@@ -1,7 +1,7 @@
 import taglib
 
-from bnpl.core import Option, OptionSet
-from bnpl.core import Transformer
+from bnpl import Option, OptionSet
+from bnpl import Transformer
 
 
 class GetTags(Transformer):
