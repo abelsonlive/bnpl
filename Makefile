@@ -21,4 +21,4 @@ install:
 	python setup.py install;
 
 test:
-	cd tests; python test_pipeline.py | jq '.'
+	cd tests; sh test_pipeline.sh;
