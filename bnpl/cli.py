@@ -18,14 +18,13 @@ def setup_plugins(subparser, plugins):
     for opt in plugin['options']:
       if opt['name'] == "help": continue
       desc = 'Accepts: "{type}" type. '.format(**opt)
-      if opt['required']:
-        desc += 'Required: True.'
-      if opt['default']:
+      default = opt.get('default', None)
+      if default:
         desc += 'Default: "{default}". '.format(**opt)
       cmd_parser.add_argument('--{0}'.format(opt['name']), 
                               help=opt.get('descrption', desc), 
-                              default=opt.get('default', None),
-                              required=opt.get('required', False))
+                              default=default,
+                              required=opt.get('required', default is not None))
     subcommands[key] = plugins[plugin["name"]]
   return subcommands
 
@@ -37,7 +36,7 @@ def run():
   # create an argparse instance
   parser = argparse.ArgumentParser(prog='bnpl', usage=SUPPRESS)
 
-  subparser = parser.add_subparsers(help='Subcommands', dest='cmd')
+  subparser = parser.add_subparsers(help='Plugins', dest='cmd')
 
   plugins = Factory()
   subcommands = setup_plugins(subparser, plugins)

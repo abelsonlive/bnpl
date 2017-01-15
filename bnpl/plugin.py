@@ -453,6 +453,12 @@ class Transformer(Plugin):
   """
   type = 'transformer'
 
+class  Mixer(Plugin):
+  """
+  Accepts a sound + parameters and returns a modified sound or one or more new sounds
+  """
+  type = 'mixer'
+
 class Exporter(Plugin):
 
   """
@@ -511,6 +517,10 @@ class Factory(ConfigMixin):
   def __init__(self):
     self._plugins = defaultdict(dict)
     self._factory = {}
+    self._factory['importer'] = Importer 
+    self._plugins['importer']['class'] = Importer 
+    self._plugins['importer']['module'] = 'core'
+    self._plugins['importer']['import_path'] = 'bnpl.Importer'
     self._register_plugins()
 
   def describe(self):

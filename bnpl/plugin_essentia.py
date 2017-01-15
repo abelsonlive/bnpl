@@ -4,7 +4,9 @@ from bnpl.exc import TransformerError
 
 
 class FreeSound(Transformer):
-  
+  """
+  Extract bpm + key via essentia free sound.
+  """
   options = OptionSet(
     Option('freesound_path', type='path', required=True, 
             help="Local path to freesound binary",

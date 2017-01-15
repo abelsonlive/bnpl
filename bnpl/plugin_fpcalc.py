@@ -12,7 +12,7 @@ class UID(Transformer):
   Use chromaprint's fpcalc to assign a sound uid.
   """
   options = OptionSet(
-    Option('fpcalc_path', type="path", required=True, default=DEFAULT_PATH)
+    Option('fpcalc_path', type="path", default=DEFAULT_PATH)
   )
 
   def run(self, sound):
