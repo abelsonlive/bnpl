@@ -33,6 +33,7 @@ from unidecode import unidecode
 from flask import request
 from flask import make_response
 from flask import Response
+from collections import Counter
 from flask import send_file
 from functools import partial
 from werkzeug.utils import secure_filename
@@ -73,7 +74,7 @@ def json_serialize(o):
         return list(o)
       if isinstance(o, Counter):
         return dict(o)
-      if isinstance(o, RE_TYPE):
+      if isinstance(o, RegexType):
         return o.pattern
       if hasattr(o, 'to_dict'):
         return o.to_dict()
@@ -1126,12 +1127,12 @@ def api_read_file(to_tmp=True):
   # submit a empty part without filename
   if not file or file.filename == '':
     return None
+
   if to_tmp:
-    path = os.path.join('/tmp', secure_filename(file.filename))
-    file.save(path)
-    return path 
-  else:
-    return file.read()
+    file.filename = os.path.join('/tmp', secure_filename(file.filename))
+    file.save(file.filepath)
+    return file 
+  return file
 
 def api_write_file(path_or_byes, **kwargs):
   """

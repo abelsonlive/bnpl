@@ -21,4 +21,4 @@ install:
 	python setup.py install;
 
 test:
-	cd tests; python test_pipeline.py | jq '.[]' -c
+	cd tests; python test_pipeline.py | jq '.'

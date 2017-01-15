@@ -265,6 +265,10 @@ class Plugin(ConfigMixin):
   Plugin description placeholder.
   """
   type = "core"
+  # overridden by factory.
+  _module = "core"
+  _import_path = "bnpl.plugin.Plugin"
+
   options = OptionSet(
     Option("help", type="boolean", default=False, help="placeholder")
   )
@@ -277,6 +281,9 @@ class Plugin(ConfigMixin):
     self._load_options(**options)
     self._load_data(data)
     self._load_file()
+    self._load_sounds
+    self._errors = []
+    # overwritten by Factory
 
   def _load_context(self, ctxt):
     """
@@ -314,6 +321,34 @@ class Plugin(ConfigMixin):
     if self._context == 'api':
       self.file = util.api_read_file()
 
+  def _load_sounds(self):
+    """
+    """
+    self.sounds = []
+
+    if self.has_data:
+      def __gen():      
+        for sound in self.data:
+          yield Sound(**sound)
+      self.sounds =  __gen()
+
+    elif self.has_file:
+      self.sounds =  [Sound(path=self.file.filename)]
+
+  @property
+  def has_data(self):
+    """
+    """
+    if inspect.isgenerator(self.data):
+      return True 
+    return len(self.data) > 0
+
+  @property
+  def has_file(self):
+    """
+    """
+    return self.file is not None
+
   @property
   def name(self):
     """
@@ -331,12 +366,27 @@ class Plugin(ConfigMixin):
       d = ""
     return d.replace("\n", " ").strip()
 
+  @property
+  def module(self):
+    """
+    """
+    return self._module
+
+  @property
+  def import_path(self):
+    """
+    """
+    self._import_path
+
+
   def to_dict(self):
     """
 
     """
     return {
       'name': self.name,
+      'module': self.module,
+      'import_path': self.import_path,
       'description': self.description,
       'type': self.type,
       'options': self.options.describe()
@@ -352,13 +402,51 @@ class Plugin(ConfigMixin):
     """
     raise NotImplemented
 
+  def _switch(self, *args, **kwargs):
+    """
+    determine execution
+    """
+    def _run():
+      return self.run()
+    
+    if self.type != 'extractor' and not self.has_data:
+      assert(isinstance(args[0], Sound))
+      def _run():
+        return self.run(args[0])
+
+    elif self.type == "transformer":
+      def _run():
+        for sound in self.sounds:
+          yield self.run(sound)
+    
+    elif self.type in ["exporter", "importer"]:
+      def _run():
+        return self.run(self.sounds)
+
+    return _run()
+
+  def _return(self, output):
+    """
+    handle output
+    """
+    if self._context == "python":
+      return output 
+
+    elif self._context == "api":
+      return util.api_write_data(output)
+
+    elif self._context == "cli":
+      return util.cli_write_data(output)
 
   def execute(self, *args, **kwargs):
     """
     For internal usage.
     """
-    return self.run(*args, **kwargs) 
-
+    if self.options.help:
+      output = self.describe()
+    else:
+      output = self._switch(*args, **kwargs)
+    return self._return(output)
 
 class Extractor(Plugin):
   """
@@ -407,7 +495,6 @@ class Importer(Plugin):
       sound = Sound(**sound)
     return sound.put()
 
-
 class Pipeline(Plugin):
   """
   A plugin that runs plugins.
@@ -424,10 +511,48 @@ class Pipeline(Plugin):
 
 
 class Factory(ConfigMixin):
-
+  INTERNAL = [
+    'Transformer', 'Exporter', 'Importer', 
+    'Extractor', 'Plugin', 'Pipeline'
+  ]
   def __init__(self):
-    self._plugins = defaultdict(list)
+    self._plugins = defaultdict(dict)
+    self._factory = {}
     self._register_plugins()
+
+  def describe(self):
+    """
+    """
+    _l = []
+    for nm, items in self._plugins.iteritems():
+      d = self._factory[nm](_context="internal").describe()
+      d['import_path'] = items['import_path']
+      d['module'] = items['module']
+      _l.append(d)
+    return _l
+
+  def to_dict(self):
+    """
+    """
+    return {
+      '{module}.{name}'.format(**d):d for d in self.describe()
+    } 
+
+  def to_json(self):
+    """
+    """
+    return util.dict_to_json(self.describe())
+
+  def to_yml(self):
+    """
+    """
+    return util.dict_to_yml(self.to_dict())
+
+
+  def __getitem__(self, key):
+    """
+    """
+    return self._factory.get(key)
 
   def _register_plugins(self):
     """
@@ -445,14 +570,13 @@ class Factory(ConfigMixin):
         continue
 
       name = util.path_get_filename(fp, ext=False)
-      short_name = name.replace("plugin_", "")    
+      module = name.replace("plugin_", "")    
       pkg = '%s.%s' % (package_name, name)
       m = importlib.import_module(pkg)
 
       for item in dir(m):
-        
         # ignore subclasses
-        if item in ['Transformer', 'Exporter', 'Importer', 'Extractor', 'Plugin']:
+        if item in self.INTERNAL:
           continue
 
         # ignore internal
@@ -460,34 +584,25 @@ class Factory(ConfigMixin):
           continue
 
         # load object
-        item = getattr(m, item, None)
-        if not item:
+        obj = getattr(m, item, None)
+        if not obj:
           continue
 
         # ensure class
-        if not inspect.isclass(item):
+        if not inspect.isclass(obj):
           continue
 
         # check type
-        if not issubclass(item, Plugin):
+        if not issubclass(obj, Plugin):
           continue
 
-        p = item(_context="internal")
-        if p.type == "core":
+        import_path = "{0}.{1}".format(pkg, item)
+        if import_path in self._plugins:
           continue
-        self._plugins[short_name].append(item)
+        nm = obj(_context="internal").name
+        self._factory[nm] = obj
+        self._plugins[nm]['class'] = obj 
+        self._plugins[nm]['module'] = module 
+        self._plugins[nm]['import_path'] = import_path
 
-  def describe(self):
-    """
-    """
-    _services = []
-    for plugin, services in self._plugins.iteritems():
-      for service in services:
-        d = service(_context="internal").describe()
-        d['plugin'] = plugin
-        _services.append(d)
-    return _services
-
-  def to_json(self):
-    return util.dict_to_json(self.describe())
 
