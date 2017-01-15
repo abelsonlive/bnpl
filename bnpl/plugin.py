@@ -557,8 +557,8 @@ class Factory(ConfigMixin):
     } 
 
   def to_api(self):
-    return util.api_write_data(self.to_dict())
-  
+    return util.api_write_data(self.describe())
+
   def to_json(self):
     """
     """
