@@ -6,4 +6,4 @@ from bnpl.plugin import (
 )
 
 plugins = Factory()
-print plugins.describe()
+print plugins.to_json()

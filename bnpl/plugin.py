@@ -427,33 +427,55 @@ class Factory(ConfigMixin):
 
   def __init__(self):
     self._plugins = defaultdict(list)
-    self._register()
+    self._register_plugins()
 
-  def _register(self):
+  def _register_plugins(self):
     """
 
     """
     import bnpl
+
     package_name = bnpl.__name__
     package_path = bnpl.__path__[0]
+
     for fp in util.path_list(package_path):
-      if ( fp.endswith('.pyc') or '__init__'  in fp or 'templates' in fp or '.yml' in fp or '/ext/' in fp):
+
+      # filter crud
+      if not (fp.endswith('.py') and 'plugin_' in fp):
         continue
+
       name = util.path_get_filename(fp, ext=False)
       short_name = name.replace("plugin_", "")    
-      m = importlib.import_module('%s.%s' % (package_name, name))
+      pkg = '%s.%s' % (package_name, name)
+      m = importlib.import_module(pkg)
+
       for item in dir(m):
+        
+        # ignore subclasses
+        if item in ['Transformer', 'Exporter', 'Importer', 'Extractor', 'Plugin']:
+          continue
+
+        # ignore internal
+        if item.startswith("_"):
+          continue
+
+        # load object
         item = getattr(m, item, None)
         if not item:
           continue
+
+        # ensure class
         if not inspect.isclass(item):
           continue
+
+        # check type
         if not issubclass(item, Plugin):
-          continue 
+          continue
+
         p = item(_context="internal")
         if p.type == "core":
           continue
-        self._plugins[short_name].append(p)
+        self._plugins[short_name].append(item)
 
   def describe(self):
     """
@@ -461,8 +483,11 @@ class Factory(ConfigMixin):
     _services = []
     for plugin, services in self._plugins.iteritems():
       for service in services:
-        d = p.describe()
+        d = service(_context="internal").describe()
         d['plugin'] = plugin
         _services.append(d)
     return _services
+
+  def to_json(self):
+    return util.dict_to_json(self.describe())
 
