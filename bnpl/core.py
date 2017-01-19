@@ -254,8 +254,7 @@ class Sound(ConfigMixin):
     """
     """
     v = getattr(self, k, self.properties.get(k, None))
-    if not v:
-      return ""
+    if not v: return ""
     return "{0}{slug_delim}".format(util.string_to_slug(str(v)), **self.config['bnpl'])
 
   @property

@@ -21,4 +21,4 @@ install:
 	python setup.py install;
 
 test:
-	cd tests; sh test_pipeline.sh;
+	tests/test_pipeline.sh;

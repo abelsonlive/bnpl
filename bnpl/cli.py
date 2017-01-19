@@ -13,7 +13,7 @@ def setup_plugins(subparser, plugins):
   """
   subcommands = {}
   for plugin in plugins.describe():
-    key = "{module}.{name}".format(**plugin)
+    key = "{name}".format(**plugin)
     cmd_parser = subparser.add_parser(key, help=plugin["description"])
     for opt in plugin['options']:
       if opt['name'] == "help": continue

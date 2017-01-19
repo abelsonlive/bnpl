@@ -205,10 +205,10 @@ class OptionSet(ConfigMixin):
     missing = filter(lambda x: x not in self._parsed, self._required)
     n_missing = len(missing)
     if n_missing > 0:
-      suffx = "s"
+      suffix = "s"
       if n_missing <2:
-        suffx = ""
-      return True, "Missing required option{0}: {1}".format(suffx, ", ".join(missing))
+        suffix = ""
+      return True, "Missing required option{0}: {1}".format(suffix, ", ".join(missing))
     return False, ""
 
   def _check_errors(self):
@@ -243,13 +243,13 @@ class OptionSet(ConfigMixin):
 
   def describe(self):
     """
-    Format options as a dictionary
+    Describe all options.
     """
     return [o.describe() for o in self._options]
 
   def to_yml(self):
     """
-    Format options as json.
+    Format options as yml.
     """
     return util.dict_to_yml(self.to_dict())
 
@@ -418,9 +418,9 @@ class Plugin(ConfigMixin):
     def _run():
       return self.run()
     
-    if self.type != 'extractor' and type != 'pipeline' and not self.has_data:
+    if self.type not in ('extractor', 'pipeline') and not self.has_data:
       def _run():
-        return self.run(args[0])
+        return self.run(args[0]) # accepts data as first positional arg.
 
     elif self.type == "transformer":
       def _run():

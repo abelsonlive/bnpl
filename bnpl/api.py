@@ -55,6 +55,8 @@ def list_plugins():
 
 @app.route('/api/plugins/<name>', methods=['GET'])
 def get_plugin(name):
+  """
+  """
   p = plugins.to_dict().get(name)
   return util.api_write_data(p)
 
