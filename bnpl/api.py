@@ -25,33 +25,48 @@ def list_sounds():
   """
   return Extractor(_context="api").do()
 
-@app.route('/api/sounds', methods=['POST', 'PUT'])
+
+@app.route('/api/sounds', methods=['POST', 'PUT', 'PATCH'])
 def create_sound():
   """
   """
   return Importer(_context="api").do()
 
+
 @app.route('/api/sounds', methods=['DELETE'])
 def delete_sounds():
-  pass
+  """
+  """
+  return Deleter(_context="api").do()
+
 
 @app.route('/api/sounds/<uid>.<ext>', methods=['GET'])
 def get_sound(uid, ext):
-  pass
+  """
+  """
+  return Extractor(_context="api").do()
 
-@app.route('/api/sounds/<uid>', methods=['POST', 'PUT'])
+
+@app.route('/api/sounds/<uid>', methods=['POST', 'PUT', 'PATCH'])
 def update_sound(uid):
-  pass
+  """
+  """
+  return Importer(_context="api").do()
+
 
 @app.route('/api/sounds/<uid>', methods=['DELETE'])
 def delete_sound(uid):
-  pass
+  """
+  """
+  return Deleter(_context="api").do()
+
 
 @app.route('/api/plugins', methods=['GET'])
 def list_plugins():
   """
   """
   return plugins.to_api()
+
 
 @app.route('/api/plugins/<name>', methods=['GET'])
 def get_plugin(name):
@@ -60,9 +75,12 @@ def get_plugin(name):
   p = plugins.to_dict().get(name)
   return util.api_write_data(p)
 
+
 @app.route('/api/plugins/<name>', methods=['POST'])
 def run_plugin(name):
-  pass
+  p = plugins.get(name)
+  return p(_context="api").do()
+
 
 if __name__ == '__main__':
   app.run()

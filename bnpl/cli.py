@@ -35,10 +35,12 @@ def run():
   """
   # create an argparse instance
   parser = argparse.ArgumentParser(prog='bnpl', usage=SUPPRESS)
-
   subparser = parser.add_subparsers(help='Plugins', dest='cmd')
 
+  # load plugins
   plugins = Factory()
+
+  # setup subcommands
   subcommands = setup_plugins(subparser, plugins)
 
   opts, _ = parser.parse_known_args()

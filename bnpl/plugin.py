@@ -535,6 +535,7 @@ class Factory(ConfigMixin):
     self._plugins['core.importer']['class'] = Importer 
     self._plugins['core.importer']['module'] = 'core'
     self._plugins['core.importer']['import_path'] = 'bnpl.Importer'
+
     self._register_plugins()
 
   def describe(self):

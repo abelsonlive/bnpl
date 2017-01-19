@@ -21,7 +21,7 @@ class FreeSound(Transformer):
 
     """
     # configure
-    o = '/tmp/{0}-freesound-output'.format(util.ts_now())
+    o = '{tmp_dir}/{0}-freesound-output'.format(util.ts_now(), **self.config['bnpl'])
     oframes = o + "_frames.json"
     ostats = o + "_statistics.yaml"
 
@@ -52,7 +52,7 @@ class FreeSound(Transformer):
 
     """
     properties = {
-        "bpm": round(output.get('rhythm',{}).get('bpm',0), 1),
+        "bpm": round(output.get('rhythm',{}).get('bpm', 0), 1),
         "key": output.get('tonal', {}).get('key_key', '') + output.get('tonal', {}).get('key_scale', ''),
         "chord": output.get('tonal', {}).get('chord_key', '') + output.get('tonal', {}).get('chord_scale', '')
     }
