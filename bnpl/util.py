@@ -517,7 +517,7 @@ def dict_update(d, u, overwrite=False):
 
 LIST_DELIMITER = ','
 
-def list_prepare(lst, delim=LIST_DELIMITER, type="stirng"):
+def list_prepare(lst, delim=LIST_DELIMITER, type="string"):
   """
   Prepare a lst.
   """
@@ -527,10 +527,7 @@ def list_prepare(lst, delim=LIST_DELIMITER, type="stirng"):
   if list_check(lst, strict=True):
     return lst 
 
-  try:
-    return list_from_string(lst, delim=delim, type=type)
-  except:
-    raise ValueError('Invalid list type: {0}'.format(lst))
+  return list_from_string(lst, delim=delim, type=type)
 
 def list_check(lst, strict=True):
   """
@@ -539,12 +536,24 @@ def list_check(lst, strict=True):
   test = isinstance(lst, list) or isgenerator(lst)
   if test or strict:
     return test 
-  return _list_check_delim(lst, min=2) or _list_check_brackets(lst)
+  return _list_check_delim(lst, min=1) or _list_check_brackets(lst)
 
 def list_from_string(s, delim=LIST_DELIMITER, type="string"):
   """
   typed list from delimited string
   """
+  types = {
+    "string": string_prepare,
+    "integer": integer_prepare,
+    "float": float_prepare,
+    "dict": dict_prepare,
+    "boolean": boolean_prepare,
+    "path": path_prepare,
+    "regex": regex_prepare,
+    "ts": ts_prepare,
+    "date": date_prepare,
+    "set": set_prepare
+  }
   if _list_check_brackets(s):
     try:
       return json_deserialize(s)
@@ -557,7 +566,7 @@ def list_from_string(s, delim=LIST_DELIMITER, type="string"):
     delim = _list_check_delim(s, default=LIST_DELIMITER)
 
   # parse items
-  return Type(type).prepare(filter(lambda x: x.strip() is not None, s.split(delim)))
+  return map(types[type], filter(lambda x: x.strip() is not None, s.split(delim)))
 
 def list_to_string(lst, delim=LIST_DELIMITER, brackets=False):
   """

@@ -1,6 +1,7 @@
 import importlib
 import inspect
 from collections import OrderedDict, defaultdict
+from traceback import format_exc
 
 from bnpl import util
 from bnpl.core import ConfigMixin 
@@ -10,6 +11,7 @@ from bnpl.core import Sound
 ########################################
 # type utilies 
 ########################################
+
 
 class OptionType(object):
 
@@ -36,7 +38,10 @@ class OptionType(object):
     """
     """
     func = self._types[type or self.type][0]
-    return func(value)  
+    try:
+      return func(value)
+    except Exception as e:
+      raise ValueError("{0}\n{1}".format(e.message, format_exc()))
 
   def check(self, value, type=None):
     """
@@ -85,10 +90,10 @@ class Option(ConfigMixin):
       self.value = copy.copy(self.default)
     else:
       self.value = val 
-    try:
-      self.value = self.parser.prepare(self.value)
-    except:
-      raise ValueError('Invalid {0} type: {1}'.format(self.type, val))
+    # try:
+    self.value = self.parser.prepare(self.value)
+    # except:
+    #   raise ValueError('Invalid {0} type: {1}'.format(self.type, val))
     if not self.value and self.required:
       raise ValueError('Missing required option: {0}'.format(self.name))
     if self.type == "list" and self.items:
@@ -221,7 +226,8 @@ class OptionSet(ConfigMixin):
       self._errors.append(msg)
 
     if len(self._errors):
-      message = "Invalid Option Set!\nErrors:\n{0}".format("\n".join(self._errors))
+      message = "Invalid Option Set!\nErrors:\n{0}\nTraceback:{1}"\
+                .format("\n".join(self._errors), util.error_tb())
       raise ValueError(message)
 
   def prepare(self, **raw):
@@ -484,6 +490,12 @@ class Deleter(object):
   """
 
   """
+
+  options = OptionSet(
+    Option('pool_size', type="integer", default=10)
+  )
+
+
   type = 'deleter'
 
 

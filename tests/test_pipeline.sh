@@ -1,7 +1,5 @@
 #!/bin/sh 
 
 bnpl file.directory --path='tests/fixtures/' |\
-	bnpl taglib.get_tags |\
 	bnpl fpcalc.uid |\
-	bnpl core.importer |\
-	jq .
+	bnpl taglib.get_tags --tags=artist,genre,title

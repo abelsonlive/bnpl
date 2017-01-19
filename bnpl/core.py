@@ -232,7 +232,7 @@ class Sound(ConfigMixin):
     self.created_at = util.date_from_any(properties.pop('created_at', None))
     self.updated_at = util.date_from_any(properties.pop('updated_at', None))
     self.ext = properties.pop('ext', util.path_get_ext(self.path))
-    self.uid = properties.pop('uid', util.string_to_uid(self.path)) + "." + self.ext
+    self.uid = properties.pop('uid', util.string_to_uid(self.path))
     self.mimetype = properties.pop('mimetype', self._get_mimetype(self.path))
     self._set_properties(properties)
 
