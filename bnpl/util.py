@@ -558,7 +558,9 @@ def list_from_string(s, delim=LIST_DELIMITER, type="string"):
     "regex": regex_prepare,
     "ts": ts_prepare,
     "date": date_prepare,
-    "set": set_prepare
+    "set": set_prepare,
+    "filter": filter_prepare,
+    "order": order_prepare
   }
   if _list_check_brackets(s):
     try:
@@ -839,6 +841,113 @@ def regex_check(s):
     return False
 
 ##########################################
+# Filter Utilities
+##########################################
+# key.subkey:value (match sub-value)
+# key:=value (match, equivalent to ':')
+# key:~value (regex match)
+# key:?value (text search)
+# key:>value (lt/gt/lte/gte than value)
+# key:value+value (match all values)
+# key:value|value (match one of values)
+# 
+# reserverd keys
+# compare:(and|or) how to combine multiple filters.
+#
+# order:key (order ascending)
+# order:-key (order descending)
+# order:key1,-key2 (order by multiple fields)
+
+re_filter = re.compile(\
+  r"([a-z][a-z0-9\.\_]+):([\=\~\!\?\>\<]+)?([\'\"])?([^\',]+)([\"\'])?")
+
+re_filter_value = re.compile(\
+  r"([^\|\+]+)([\|\+])?")
+
+filter_op_map = {
+  '': 'eq',
+  '=' : 'eq',
+  '>=': 'gte',
+  '<': 'lt',
+  '>': 'gt',
+  '>=': 'gte',
+  '?': 'query',
+  '~': 'regex'
+}
+
+def filter_prepare(s):
+  """
+  
+  """
+  try:
+    return re.compile(s)
+  except:
+    raise ValueError("Invalud regex type: {0}".format(s))
+
+def filter_check(s, strict=True):
+  """
+
+  """
+  if strict:
+    return len(re_filter.findall(s)[0]) > 1 
+  return True
+def filter_parse(s):
+  """
+
+  """
+  # if not len(filters):
+  #   raise ValueError('Invalid filter type: {0}'.format(s))
+  output = {}
+  output['filter'] = []
+  output['compare'] = "and"
+  output["order"] = []
+
+  for f in re_filter.findall(s):
+
+    k = f[0]
+    v = f[3]
+
+    if k == "compare":
+      if not v in ("and", "or"):
+        raise ValueError('Invalid compare value in filter: {0}'.format(s))
+      output['compare'] = v
+      break
+
+    if k  == "order":
+      output['order'].append({
+        'op': 'desc' if v.startswith('-') else 'asc',
+        'key': v.replace('-', '')
+        })
+
+    else:
+      output['filter'].append({
+        'key': f[0], 
+        'op': filter_op_map[f[1]],
+        'val': _filter_parse_value(f[3])
+      })
+
+  if not len(output['order']):
+    output['order'] = ["-created_at"]
+
+  return output
+    
+def _filter_parse_value(s):
+  """
+  """
+  items = re_filter_value.findall(s)
+  if len(items) > 1:
+    output = {
+      "items": [],
+      "compare": 'and'
+    }
+    for i in re_filter_value.findall(s):
+      if i[1] == '|':
+        output['compare'] = "or"
+      output["items"].append(i[0])
+    return output
+  return s
+
+##########################################
 # SYSTEM UTILITIES # 
 ##########################################
 
@@ -1029,7 +1138,7 @@ def cli_read_options(prog='bnpl'):
   _, arg_strings = parser.parse_known_args()
   opts = {}
   for arg_string in arg_strings:
-    key, value = _cli_parse_arg_string (arg_string)
+    key, value = _cli_parse_arg_string(arg_string)
     opts[key] = value
   return opts
 

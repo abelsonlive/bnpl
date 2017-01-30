@@ -27,6 +27,7 @@ class OptionType(object):
     'set': [util.set_prepare, util.set_check],
     'path': [util.path_prepare, util.path_check],
     'regex': [util.regex_prepare, util.regex_check],
+    'filter': [util.filter_prepare, util.filter_check],
     'string': [util.string_prepare, util.string_check]
   })
 
@@ -457,7 +458,12 @@ class Extractor(Plugin):
   """
   Accepts parameters and returns one or sounds
   """
-  type = 'extractor'
+  type = 'core'
+
+  options = OptionSet(
+    Option('filters', type="list", items="filterstring", default=10)
+  )
+
 
 class Importer(Plugin):
 
@@ -466,7 +472,7 @@ class Importer(Plugin):
   Returns sounds with created / updated_at timestamps.
   """
 
-  type = 'importer'
+  type = 'core'
 
   options = OptionSet(
     Option('pool_size', type="integer", default=10)
