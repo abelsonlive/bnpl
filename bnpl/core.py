@@ -12,7 +12,9 @@ from elasticsearch import Elasticsearch
 
 from bnpl import util
 
+
 Config = util.sys_get_config(os.getenv('BNPL_CONFIG', util.path_here(__file__, 'config/')))
+
 
 # configurations mixin.
 class ConfigMixin(object):
@@ -461,8 +463,7 @@ class Sound(ConfigMixin):
     """
     Remove file + record
     """
-    self.fs_rm()
-    self.db_rm()
+    util.exec_async([self.fs_rm, self.db_rm])
     return self
 
   def exists(self):

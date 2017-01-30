@@ -452,7 +452,7 @@ def dict_check(d, strict=True):
 
 def dict_from_json(s):
   """
-  
+  json string -> dict
   """
   return json_deserialize(s)
 
@@ -463,9 +463,15 @@ def dict_from_yml(s):
   return yml_deserializer(s)
 
 def dict_from_yml_file(p):
+  """
+  yml file -> dict
+  """
   return dict_from_yml(open(p).read())
 
 def dict_from_json_file(p):
+  """
+  json file -> dict
+  """
   return dict_from_json(open(p).read())
 
 def dict_to_json(d):
